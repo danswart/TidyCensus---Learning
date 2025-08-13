@@ -1,0 +1,781 @@
+---
+title: "TidyCensus Learning Guide"
+subtitle: ""
+description: ""
+author: 
+  - name: "Dan Swart, CPA (ret)"
+    affiliations:
+      - "SCUC-ISD Board of Trustees"
+      - "Seat 6"
+date: today
+date-format: long
+# bibliography: manual-refs.bib
+format:
+  html:
+    resources:
+      - reference-backlinks.js
+    include-after-body:    
+      - text: |
+          # <script type="text/javascript" src="reference-backlinks.js"></script>
+    default: true         
+    code-copy: true
+    code-link: true        # This adds individual buttons
+    code-fold: true        # Hide code by default, show on click
+    code-summary: "Show the code"
+    code-overflow: wrap
+    code-block-bg: "#FAEBD7"
+    code-block-border-left: "#31BAE9"
+    # embed-resources: true
+    include-in-header: header.html
+    css:
+      - swart.css
+      - tachyons.min.css
+      - r-colors.css
+    fontsize: 18pt
+    lightbox: true
+    page-layout: full
+    fig-width: 12
+    fig-height: 10
+    fig-dpi: 300
+    html-math-method: katex
+    df-print: paged
+    toc: true
+    toc-float: true
+    citeproc: true
+    link-citations: true
+    linestretch: 1.0
+    
+    
+    
+  typst:
+    fig-width: 12
+    fig-height: 10
+    fig-dpi: 300
+    margin:
+      x: 1in
+      y: 1in
+    toc: true
+    fontsize: 14pt
+    # mainfont: "Cabin"
+    
+  revealjs:
+    slide-number: true
+    transition: fade
+    code-overflow: wrap
+    center: true
+    smaller: true
+    scrollable: true
+    chalkboard: true
+    multiplex: false
+    theme: solarized
+    reference-location: margin
+    logo: img/red-cross-640-435.png
+    footer: "Footer text"
+    code-block-height: 650px
+
+
+
+  # docx:
+  #   highlight-style: github
+  #   fig_caption: true
+
+
+
+editor: source
+
+quarto:
+  render:
+    cache-refresh: true
+
+
+# for .qmd filesd
+execute:
+  echo: true
+  message: false
+  warning: false
+  eval: true
+  fig-width: 12
+  fig-height: 10
+
+
+# for .rmd files
+knitr:
+  opts_chunk:
+    echo: true
+    error: false
+    warning: false
+    message: false
+    eval: true
+    cache: false
+
+---
+
+
+```{r}
+#| label: setup
+#| include: false
+
+# Prevent scientific notation globally
+options(scipen = 999)
+
+
+options(tigris_use_cache = TRUE)
+
+# install.packages(c("mapview", "survey", "srvyr", "arcgislayers"))
+
+# census_api_key("95496766c51541ee6f402c1e1a8658581285b759", install = TRUE, overwrite = TRUE)
+
+# For me, I ALWAYS begin with the most recent development version of TidyCensus
+remotes::install_github("walkerke/tidycensus")
+
+# load libraries
+
+# library(readxl)
+# library(writexl) 
+# library(tidyr) 
+# library(readr) 
+# library(purrr) 
+# library(stringr) 
+# library(forcats) 
+# library(lubridate) 
+# library(janitor) 
+# library(ggtext) 
+# library(paletteer) 
+# library(viridis) 
+# library(RColorBrewer) 
+# library(wesanderson) 
+# library(dutchmasters) 
+# library(gghighlight) 
+# library(monochromeR) 
+# library(ggforce) 
+# library(ggthemes)
+# library(gt)
+# library(gtExtras)
+# library(tidyverse)
+# library(plotly)
+# library(ggplot2)
+# library(tibble)
+# library(patchwork)
+# library(ppcor)
+# library(ggplot2)
+# library(corrplot)
+# library(ggcorrplot)
+# library(car)
+# library(WRS2)
+# library(boot)
+# library(BayesFactor)
+# library(pwr)
+# library(qgraph)
+# library(scales)
+# library(here)
+# library(ggdag)      # For plotting DAGs
+# library(dagitty)    # For working with DAG logic
+# library(DiagrammeR) # For complete control of the layout
+# library(knitr)      # For controlling rendering
+# library(kableExtra) # For tables summarizing results
+# library(DT)         # For rendering content that kableExtra cannot (symbols)
+# library(lavaan)     # For latent variable analysis
+# library(ggpubr)
+# library(rethinking)
+# library(broom)
+
+library(tidyverse)
+library(tidycensus)
+
+
+# Force dplyr's select to take precedence
+select <- dplyr::select
+filter <- dplyr::filter
+
+# Set global theme for consistent plots
+theme_set(theme_minimal(base_size = 20) + 
+          theme(
+    plot.title = element_text(face = "bold", size = 26),    # adjust title size
+    plot.subtitle = element_text(face = "bold", size = 24), # adjust subtitle size
+    axis.title.x = element_text(face = "bold", size = 22),
+    axis.title.y = element_text(face = "bold", size = 22),
+    axis.text.x = element_text(face = "bold", size = 22, angle = 45, hjust = 1),
+    legend.position = "bottom",
+    strip.text = element_text(face = "bold"),
+    panel.spacing.x = unit(1.5, "cm"),  # Horizontal spacing only
+    panel.spacing.y = unit(1.5, "cm"),   # Vertical spacing only
+    plot.margin = margin(20, 20, 20, 20, "pt")
+    )
+)
+
+
+# Set seed for reproducibility
+set.seed(123)
+
+```
+
+ 
+ 
+# Building a TidyCensus Research Workflow
+
+## Initial Search Strategy
+
+### Goal:  Combine the following characteristics for comparison of female and male earnings, by profession
+
+Characteristics of Interest:  earnings × sex × marital status x occupation x years of experience
+
+The Census Bureau typically organizes tables around 1-2 main dimensions, not five simultaneously.
+
+(***earnings*** × sex × marital status x occupation x years of experience)
+
+
+1. Search one by one for both concept AND label variables:
+
+```{r}
+
+# Retrieve by loading the four variables (columns) from acs5 dataframe 
+all_vars_5 <- load_variables(2023, "acs5")
+
+
+# Look for any mention of your variables across both fields
+earnings_vars <- all_vars_5 %>%
+  filter(str_detect(tolower(concept), "earning|income") | 
+         str_detect(tolower(label), "earning|income"))
+
+  View(earnings_vars)
+  
+  
+# Check what concepts exist
+earnings_concepts <- earnings_vars %>% 
+  distinct(concept)
+
+  View(earnings_concepts)
+
+
+# Check what labels exist
+earnings_labels <- earnings_vars %>% 
+  distinct(label) 
+
+  View(earnings_labels)
+
+```
+
+Results:  8670 obs. of 4 variables
+
+
+
+(earnings × ***sex*** × marital status x occupation x years of experience)
+
+```{r}
+
+# Retrieve by loading the four variables (columns) from acs5 dataframe 
+all_vars_5 <- load_variables(2023, "acs5")
+
+
+# Look for any mention of your variables across both fields
+sex_vars <- all_vars_5 %>%
+  filter(str_detect(tolower(concept), "sex") | 
+         str_detect(tolower(label), "sex"))
+
+  View(sex_vars)
+  
+  
+# Check what concepts exist
+sex_concepts <- sex_vars %>% 
+  distinct(concept)
+
+  View(sex_concepts)
+
+
+# Check what labels exist for earnings
+sex_labels <- sex_vars %>% 
+  distinct(label) 
+
+  View(sex_labels)
+
+```
+
+Results:  6845 obs. of 4 variables
+
+
+
+(earnings × sex × ***marital status*** x occupation x years of experience)
+
+```{r}
+
+# Retrieve by loading the four variables (columns) from acs5 dataframe 
+all_vars_5 <- load_variables(2023, "acs5")
+
+
+# Look for any mention of your characteristics across both variables
+marital_vars <- all_vars_5 %>%
+  filter(str_detect(tolower(concept), "marital") | 
+         str_detect(tolower(label), "marital"))
+
+  View(marital_vars)
+  
+  
+# Check what concepts exist
+marital_concepts <- marital_vars %>% 
+  distinct(concept)
+
+  View(marital_concepts)
+
+
+# Check what labels exist
+marital_labels <- marital_vars %>% 
+  distinct(label) 
+
+  View(marital_labels)
+
+```
+
+Results:  918 obs. of 4 variables
+
+
+
+
+(earnings × sex × marital status x ***occupation*** x years of experience)
+
+```{r}
+
+# Retrieve by loading the four variables (columns) from acs5 dataframe 
+all_vars_5 <- load_variables(2023, "acs5")
+
+
+# Look for any mention of your characteristics across both variables
+occupation_vars <- all_vars_5 %>%
+  filter(str_detect(tolower(concept), "occupation") | 
+         str_detect(tolower(label), "occupation"))
+
+  View(occupation_vars)
+  
+  
+# Check what concepts exist
+occupation_concepts <- occupation_vars %>% 
+  distinct(concept)
+
+  View(occupation_concepts)
+
+
+# Check what labels exist
+occupation_labels <- occupation_vars %>% 
+  distinct(label) 
+
+  View(occupation_labels)
+
+```
+
+Results:  5843 obs. of 4 variables
+
+
+
+
+(earnings × sex × marital status x occupation x ***years of experience***)
+
+```{r}
+
+# Retrieve by loading the four variables (columns) from acs5 dataframe 
+all_vars_5 <- load_variables(2023, "acs5")
+
+
+# Look for any mention of your characteristics across both variables
+experience_vars <- all_vars_5 %>%
+  filter(str_detect(tolower(concept), "experience") | 
+         str_detect(tolower(label), "experience"))
+
+  View(experience_vars)
+  
+  
+# Check what concepts exist
+experience_concepts <- experience_vars %>% 
+  distinct(concept)
+
+  View(experience_concepts)
+
+
+# Check what labels exist
+experience_labels <- experience_vars %>% 
+  distinct(label) 
+
+  View(experience_labels)
+
+```
+
+Results:  1295 obs. of 4 variables
+
+
+
+
+## Explored Individual Components
+
+* B12001: Sex by Marital Status ✓ (found female never-married counts)  
+
+* B20017: Sex by Earnings ✓ (found male/female earnings)
+
+* But no table combined both ✗
+
+## The Data Discovery Process - How I Navigated Unknown Tables
+
+### 1. Pattern Recognition in Census Table Numbering
+
+I knew the Census Bureau uses systematic prefixes:
+
+B = Base detailed tables  
+S = Subject tables (pre-calculated percentages)  
+B12xxx = Marital status tables  
+B20xxx = Earnings/income tables  
+B15xxx = Education tables  
+
+
+
+
+
+### 2. Concept-Based Searching
+Instead of guessing table numbers, I searched by concepts:
+
+```{r}
+#| eval: false
+
+
+# Start broad - what tables mention earnings AND marital status?
+all_vars_5 %>%
+  filter(str_detect(concept, "earning") & 
+         str_detect(concept, "marital"))
+
+# When that failed, search separately
+all_vars_5 %>%
+  filter(str_detect(concept, "marital"))
+
+```
+
+
+### The "Show Me Everything" Approach
+
+When concept searches failed, I used table structure exploration:
+
+```{r}
+#| eval: false
+
+# See ALL variables in a promising table
+b07008_all <- all_vars_5 %>%
+  filter(str_starts(name, "B07008"))
+
+# Look at first 10-20 to understand the pattern
+print(b07008_all, n = 30)
+
+```
+
+
+### Pattern Detection Within Tables
+
+
+ACS tables follow predictable patterns:
+
+* Variables ending in _001 = Total
+
+* Male sections come before female sections
+
+* Hierarchical structure shown by !! separators
+
+Example from B12001:
+
+```{r}
+#| eval: false
+
+# B12001_001: Total
+# B12001_002: Male
+# B12001_003-010: Male categories
+# B12001_011: Female  
+# B12001_012-019: Female categories
+
+```
+
+
+### The "Which Tables Have My Variable?" Technique
+
+When I found "never married" existed, I asked: where else does it appear?
+
+
+```{r}
+#| eval: false
+
+# Find all tables with "never married"
+never_married_any <- all_vars_5 %>%
+  filter(str_detect(label, "never married")) %>%
+  mutate(table = str_extract(name, "^[A-Z][0-9]+")) %>%
+  count(table, sort = TRUE)
+
+```
+
+
+### Table Discovery by Counting
+
+The count(table, sort = TRUE) was key - tables with MORE "never married" variables likely had more detailed breakdowns.
+
+
+### Iterative Refinement
+
+Each search failure taught me something:
+
+B07008 → Geographic mobility (not useful)
+B12001 → Marital status by sex (useful!)
+B20001 → Earnings by income brackets (not marital status)
+B20017 → Median earnings by sex (useful!)
+
+
+
+### The "Meta" Search
+When specific searches failed, I searched for what kinds of data exist:
+
+```{r}
+#| eval: false
+
+# What earnings tables exist at all?
+earnings_tables <- all_vars_5 %>%
+  filter(str_starts(name, "B20")) %>%
+  distinct(table = str_extract(name, "^[A-Z][0-9]+"), concept)
+
+```
+
+### Recognizing Data Structure Limitations
+
+The key insight came from NOT finding what we wanted:
+
+Found sex × marital status ✓
+Found sex × earnings ✓
+But NO sex × marital status × earnings ✗
+
+
+This pattern meant → need microdata (PUMS)
+
+### Key Strategies I Used:
+
+* Start with concepts, not table numbers
+
+* Use str_detect() with flexible patterns (not exact matches)
+
+* Explore table structure when you find something close
+
+* Count occurrences to find detailed tables
+
+* Look for systematic patterns in variable numbering
+
+
+
+***Conclusion:  When you can't find a three-way cross, you probably need PUMS***
+
+
+
+
+## Key Realization
+
+Standard ACS tables provide:
+
+* Earnings by sex OR
+
+* Population by sex and marital status
+
+* But NOT earnings by sex AND marital status together
+
+This meant we needed custom crosstabs → PUMS
+
+
+## PUMS Solution
+
+```{r}
+#| eval: false
+
+
+# Downloaded microdata with individual-level records
+tx_pums <- get_pums(
+  variables = c("SEX", "MAR", "WAGP", "WKHP", "ESR"),
+  state = "TX", 
+  year = 2023
+)
+
+```
+
+
+5. Analysis Refinements
+
+Basic comparison: All males vs never-married females
+
+Result: Large gap (contradicting Sowell)
+
+
+Controlled for hours: Exactly 40 hours/week
+
+Result: Gap persisted
+
+
+Professional proxy: Used $60k+ earnings as proxy for professional jobs
+
+Result: Gap narrowed but remained
+
+
+Very high earners: $100k+ comparison
+
+Result: Smallest gap (89%) but still present
+
+
+
+## Key Insights from Our Process:
+
+### When to use standard ACS tables:
+
+* Single demographic breakdowns
+
+* Common pre-calculated statistics
+
+* Geographic comparisons
+
+
+### When to go straight to PUMS:
+
+* Custom crosstabs (like earnings × sex × marital status)
+
+* Need individual-level controls
+
+* Complex filtering conditions
+
+* Research replication requiring specific variable combinations
+
+
+### Should you go PUMS first?
+
+Yes, if you need:
+
+* Multiple variables crossed in ways ACS doesn't provide
+
+* To control for several factors simultaneously
+
+* To replicate academic research
+
+* Custom age ranges, hour brackets, etc.
+
+
+No, stick with ACS tables if:
+
+* You need standard statistics by standard geographies
+
+* You want margins of error calculated for you
+
+* You're doing simple comparisons
+
+* You need small geography data (PUMS uses PUMAs, not school districts)
+
+
+
+### The Proxy Innovation
+
+When we lacked occupation codes, using wage levels ($60k+, $100k+) as a proxy for professional status was clever because:
+
+* High wages correlate with professional occupations
+
+* It allowed testing Sowell's hypothesis about professional women
+
+* Showed the gap narrows but persists at higher income levels
+
+
+This workflow shows how exploratory data analysis often requires pivoting from the original plan when you discover data limitations!
+
+
+
+
+# Sowell's comparison - Part 1
+
+```{r}
+#| eval: false
+
+
+
+tx_pums <- get_pums(
+  variables = c("SEX", "MAR", "WAGP", "WKHP", "ESR"), 
+  state = "TX",
+  survey = "acs5",
+  year = 2023
+)
+
+glimpse(tx_pums)
+
+```
+
+# Sowell's comparison - Part 2 of 2
+
+
+```{r}
+#| eval: false
+
+
+# High earners as proxy for professionals
+professionals_proxy <- tx_pums %>%
+  filter(
+    WAGP >= 60000,  # $60k+ as professional proxy
+    WKHP == 40,
+    ESR %in% c("1", "2")
+  ) %>%
+  mutate(
+    group = case_when(
+      SEX == "1" ~ "Male",
+      SEX == "2" & MAR == "5" ~ "Female Never Married",
+      TRUE ~ "Female Other"
+    )
+  ) %>%
+  group_by(group) %>%
+  summarise(
+    median_wage = median(WAGP),
+    n = n()
+  )
+
+glimpse(professionals_proxy)
+
+```
+
+# Statistically different?
+
+```{r}
+#| eval: false
+
+
+# Statistical test for professional wages
+prof_test <- tx_pums %>%
+  filter(WAGP >= 60000, WKHP == 40, ESR %in% c("1", "2")) %>%
+  filter(SEX == "1" | (SEX == "2" & MAR == "5"))  # Males vs never-married females
+
+t.test(WAGP ~ SEX, data = prof_test)
+
+```
+
+
+# Compare very high earners
+
+```{r}
+#| eval: false
+
+
+
+# Since we don't have education in our data, let's look at very high earners
+# where education is likely similar
+very_high_earners <- tx_pums %>%
+  filter(
+    WAGP >= 100000,  # $100k+ 
+    WKHP == 40,
+    ESR %in% c("1", "2")
+  ) %>%
+  mutate(
+    group = case_when(
+      SEX == "1" ~ "Male",
+      SEX == "2" & MAR == "5" ~ "Female Never Married"
+    )
+  ) %>%
+  filter(group %in% c("Male", "Female Never Married")) %>%
+  group_by(group) %>%
+  summarise(
+    median_wage = median(WAGP),
+    mean_wage = mean(WAGP),
+    n = n()
+  )
+
+glimpse(very_high_earners)
+
+```
+
+
+
+

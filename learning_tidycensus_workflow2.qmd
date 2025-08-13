@@ -1,0 +1,420 @@
+---
+title: "TidyCensus Multi-Variable Research Workflow"
+subtitle: "Finding ACS Tables for Earnings × Demographics Analysis"
+author: "Research Workflow"
+date: "`r Sys.Date()`"
+format: 
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    theme: cosmo
+  pdf:
+    toc: true
+    number-sections: true
+editor: visual
+---
+
+## Overview
+
+This workflow demonstrates strategies for finding American Community Survey (ACS) tables that contain multiple demographic characteristics simultaneously, specifically focusing on:
+
+- Earnings/Income
+- Sex 
+- Marital Status
+- Occupation
+- Years of Experience
+
+## Setup
+
+```{r setup, message=FALSE, warning=FALSE}
+library(tidycensus)
+library(tidyverse)
+library(DT)
+
+# Set your Census API key (get one at https://api.census.gov/data/key_signup.html)
+# census_api_key("YOUR_KEY_HERE", install = TRUE)
+```
+
+## Step 1: Load All Available Variables
+
+```{r load-variables}
+# Load all ACS 5-year variables for 2023
+all_vars_5 <- load_variables(2023, "acs5")
+
+# Examine structure
+glimpse(all_vars_5)
+```
+
+## Step 2: Initial Exploration (The "Hail Mary" Approach)
+
+```{r initial-search}
+# Original approach: search for all five variables in concept field
+all_variables <- all_vars_5 %>%
+  filter(str_detect(concept, "earning|income") &
+         str_detect(concept, "sex") &
+         str_detect(concept, "marital") &
+         str_detect(concept, "occupation") &
+         str_detect(concept, "experience"))
+
+# Result: Zero matches (as expected)
+nrow(all_variables)
+```
+
+**Reality Check:** This approach yields zero results because ACS tables typically organize data around 1-2 main dimensions, not five simultaneously.
+
+## Step 3: Strategic Variable Discovery
+
+### 3.1 Search Both Concept AND Label Fields
+
+```{r search-both-fields}
+# Search for earnings/income in both concept and label
+earnings_vars <- all_vars_5 %>%
+  filter(str_detect(tolower(concept), "earning|income|wage") | 
+         str_detect(tolower(label), "earning|income|wage"))
+
+# Examine unique concepts for earnings
+earnings_concepts <- earnings_vars %>% 
+  distinct(concept) %>%
+  arrange(concept)
+
+print(paste("Found", nrow(earnings_concepts), "different earnings-related concepts"))
+```
+
+```{r display-earnings-concepts}
+# Display earnings concepts
+earnings_concepts %>%
+  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
+```
+
+### 3.2 Search for Combinations of 2-3 Variables
+
+```{r combination-search}
+# Earnings × Sex
+earnings_sex <- all_vars_5 %>%
+  filter((str_detect(tolower(concept), "earning|income|wage")) &
+         (str_detect(tolower(concept), "sex|male|female")))
+
+# Earnings × Marital Status  
+earnings_marital <- all_vars_5 %>%
+  filter((str_detect(tolower(concept), "earning|income|wage")) &
+         (str_detect(tolower(concept), "marital")))
+
+# Earnings × Occupation
+earnings_occupation <- all_vars_5 %>%
+  filter((str_detect(tolower(concept), "earning|income|wage")) &
+         (str_detect(tolower(concept), "occupation")))
+
+# Display results
+combinations_summary <- tibble(
+  combination = c("Earnings × Sex", "Earnings × Marital", "Earnings × Occupation"),
+  n_variables = c(nrow(earnings_sex), nrow(earnings_marital), nrow(earnings_occupation))
+)
+
+combinations_summary
+```
+
+### 3.3 Explore Specific Table Series
+
+```{r table-series}
+# B20 series: Earnings tables
+b20_tables <- all_vars_5 %>%
+  filter(str_starts_with(name, "B20")) %>%
+  distinct(concept) %>%
+  arrange(concept)
+
+# B08 series: Commuting and occupation tables  
+b08_tables <- all_vars_5 %>%
+  filter(str_starts_with(name, "B08")) %>%
+  distinct(concept) %>%
+  arrange(concept)
+
+# B19 series: Income tables
+b19_tables <- all_vars_5 %>%
+  filter(str_starts_with(name, "B19")) %>%
+  distinct(concept) %>%
+  arrange(concept)
+
+print(paste("B20 (Earnings) tables:", nrow(b20_tables)))
+print(paste("B08 (Commuting/Occupation) tables:", nrow(b08_tables)))
+print(paste("B19 (Income) tables:", nrow(b19_tables)))
+```
+
+```{r display-key-tables}
+# Display most promising table series
+key_tables <- bind_rows(
+  b20_tables %>% mutate(series = "B20"),
+  b08_tables %>% mutate(series = "B08"), 
+  b19_tables %>% mutate(series = "B19")
+) %>%
+  select(series, concept)
+
+key_tables %>%
+  DT::datatable(options = list(pageLength = 15, scrollX = TRUE))
+```
+
+## Step 4: Deep Dive into Promising Tables
+
+```{r promising-tables}
+# Function to examine a specific table in detail
+examine_table <- function(table_pattern) {
+  all_vars_5 %>%
+    filter(str_detect(name, table_pattern)) %>%
+    select(name, label, concept) %>%
+    head(20)
+}
+
+# Example: Look at B20017 (Median Earnings by Sex and Work Experience)
+b20017_vars <- examine_table("B20017")
+print("B20017 Variables (Median Earnings by Sex and Work Experience):")
+```
+
+```{r display-b20017}
+b20017_vars %>%
+  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
+```
+
+## Step 5: Alternative Approaches
+
+### 5.1 Consider PUMS Data
+
+```{r pums-option, eval=FALSE}
+# For complex multi-dimensional analysis, consider PUMS (Public Use Microdata)
+# This gives you individual-level records that you can cross-tabulate yourself
+
+# Example PUMS call (not run here):
+# pums_data <- get_pums(
+#   variables = c("SEX", "MAR", "OCCP", "WAGP", "AGEP"),
+#   state = "CA",
+#   year = 2023,
+#   survey = "acs5"
+# )
+```
+
+### 5.2 Multiple Table Strategy
+
+```{r multiple-table-strategy}
+# Strategy: Use multiple related tables and join them
+# Example workflow for combining tables:
+
+# 1. Get earnings by sex from one table
+# 2. Get marital status distributions from another table  
+# 3. Get occupation data from a third table
+# 4. Use geographic identifiers to join at appropriate level
+
+# This requires careful consideration of:
+# - Geographic levels (state, county, tract, etc.)
+# - Margin of error calculations when combining estimates
+# - Potential ecological fallacy issues
+```
+
+## Step 6: Recommended Workflow
+
+```{r recommended-workflow, eval=FALSE}
+# 1. Start with PUMS for complex multi-dimensional analysis
+pums_data <- get_pums(
+  variables = c("SEX", "MAR", "OCCP", "WAGP", "AGEP", "WKHP"),
+  state = "all",  # or specific states
+  year = 2023,
+  survey = "acs5"
+)
+
+# 2. For summary statistics, identify best 2-3 variable combinations:
+# - Table B20017: Median earnings by sex and work experience  
+# - Table B19001: Household income distribution
+# - Custom tabulations from PUMS data
+
+# 3. Use get_acs() for specific tables:
+earnings_by_sex <- get_acs(
+  geography = "state",
+  table = "B20017",
+  year = 2023,
+  survey = "acs5"
+)
+```
+
+## Next Steps
+
+1. **Prioritize Your Variables**: Identify which 2-3 characteristics are most important
+2. **Consider PUMS**: For maximum flexibility in cross-tabulations
+3. **Geographic Level**: Decide on appropriate geographic granularity
+4. **Margin of Error**: Plan for uncertainty quantification in combined estimates
+5. **Validation**: Cross-check results with multiple data sources when possible
+
+## Resources
+
+- [TidyCensus Documentation](https://walker-data.com/tidycensus/)
+- [Census Table Finder](https://data.census.gov/cedsci/)
+- [ACS Technical Documentation](https://www.census.gov/programs-surveys/acs/technical-documentation.html)
+- [PUMS Data Dictionary](https://www.census.gov/programs-surveys/acs/microdata/documentation.html)
+
+## Step 7: Finding Which Table Contains Each Variable
+
+### 7.1 Understanding Variable Name Structure
+
+```{r variable-structure}
+# Load variables again for demonstration
+all_vars_5 <- load_variables(2023, "acs5")
+
+# Examine the structure of variable names
+sample_vars <- all_vars_5 %>%
+  head(20) %>%
+  select(name, label, concept)
+
+# Variable names follow pattern: [TABLE]_[SEQUENCE][E/M]
+# E = Estimate, M = Margin of Error
+# Examples: B01001_001E, B19013_001E, etc.
+
+sample_vars
+```
+
+### 7.2 Extract Table Names from Variable Names
+
+```{r extract-tables}
+# Extract table names from variable names
+all_vars_with_tables <- all_vars_5 %>%
+  mutate(
+    # Remove the _XXX[E/M] suffix to get table name
+    table_name = str_extract(name, "^[A-Z][0-9]{5}[A-Z]*"),
+    # Extract the sequence number and estimate/MOE indicator
+    sequence = str_extract(name, "_[0-9]{3}[EM]$"),
+    # Clean sequence to just the number
+    sequence_num = as.numeric(str_extract(sequence, "[0-9]{3}")),
+    # Estimate or Margin of Error
+    est_moe = str_extract(sequence, "[EM]")
+  )
+
+# Look at the structure
+glimpse(all_vars_with_tables)
+```
+
+### 7.3 Find All Tables and Their Variables
+
+```{r tables-summary}
+# Summary of all tables
+tables_summary <- all_vars_with_tables %>%
+  filter(!is.na(table_name)) %>%
+  group_by(table_name, concept) %>%
+  summarise(
+    n_variables = n(),
+    min_sequence = min(sequence_num, na.rm = TRUE),
+    max_sequence = max(sequence_num, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(table_name)
+
+print(paste("Total number of tables:", nrow(tables_summary)))
+
+# Display first 20 tables
+head(tables_summary, 20)
+```
+
+### 7.4 Search for Specific Variables by Table
+
+```{r search-by-table}
+# Function to find all variables in a specific table
+get_table_variables <- function(table_name) {
+  all_vars_with_tables %>%
+    filter(str_detect(name, paste0("^", table_name))) %>%
+    select(name, label, concept, sequence_num, est_moe) %>%
+    arrange(sequence_num)
+}
+
+# Example: Get all variables in table B20017 (earnings by sex and experience)
+b20017_all <- get_table_variables("B20017")
+print(paste("Table B20017 has", nrow(b20017_all), "variables"))
+```
+
+```{r display-table-variables}
+b20017_all %>%
+  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
+```
+
+### 7.5 Find Tables Containing Specific Keywords
+
+```{r keyword-search}
+# Function to find tables containing specific keywords
+find_tables_by_keyword <- function(keyword) {
+  tables_summary %>%
+    filter(str_detect(tolower(concept), tolower(keyword))) %>%
+    arrange(desc(n_variables))
+}
+
+# Find all tables related to earnings
+earnings_tables <- find_tables_by_keyword("earning")
+print(paste("Found", nrow(earnings_tables), "tables related to earnings"))
+
+earnings_tables %>%
+  head(10)
+```
+
+### 7.6 Reverse Lookup: From Variable to Table
+
+```{r reverse-lookup}
+# Function to find which table a specific variable belongs to
+find_variable_table <- function(variable_name) {
+  all_vars_with_tables %>%
+    filter(name == variable_name) %>%
+    select(name, table_name, label, concept)
+}
+
+# Example: Find what table contains B19013_001E (median household income)
+variable_info <- find_variable_table("B19013_001E")
+variable_info
+```
+
+### 7.7 Data Source Information
+
+```{r data-source}
+# The load_variables() function pulls from Census API endpoints:
+# https://api.census.gov/data/2023/acs/acs5/variables.json
+
+# You can also access this directly:
+api_url <- "https://api.census.gov/data/2023/acs/acs5/variables.json"
+print(paste("Data source:", api_url))
+
+# The four columns come from the JSON structure:
+# - name: variable identifier 
+# - label: descriptive text
+# - concept: table/topic description
+# - geography: geographic levels available (not always populated)
+```
+
+### 7.8 Complete Table Exploration Function
+
+```{r exploration-function}
+# Comprehensive function to explore any table
+explore_table <- function(table_name) {
+  
+  # Get all variables for this table
+  table_vars <- get_table_variables(table_name)
+  
+  # Get estimates only (exclude margins of error)
+  estimates_only <- table_vars %>%
+    filter(est_moe == "E")
+  
+  # Print summary
+  cat("Table:", table_name, "\n")
+  cat("Concept:", unique(table_vars$concept), "\n")
+  cat("Total variables:", nrow(table_vars), "\n")
+  cat("Estimates:", nrow(estimates_only), "\n")
+  cat("Margins of Error:", nrow(table_vars) - nrow(estimates_only), "\n\n")
+  
+  # Return the estimates for viewing
+  return(estimates_only)
+}
+
+# Example usage
+b19001_info <- explore_table("B19001")
+```
+
+```{r display-exploration}
+b19001_info %>%
+  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
+```
+
+## Session Info
+
+```{r session-info}
+sessionInfo()
+```
