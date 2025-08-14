@@ -1,40 +1,226 @@
 ---
 title: "TidyCensus Multi-Variable Research Workflow"
-subtitle: "Finding ACS Tables for Earnings × Demographics Analysis"
-author: "Research Workflow"
+subtitle: "Finding ACS Tables for Earnings × Demographic Analysis"
+description: ""
+author: 
+  - name: "Dan Swart, CPA (ret)"
+    affiliations:
+      - "SCUC-ISD Board of Trustees"
+      - "Seat 6"
 date: "`r Sys.Date()`"
-format: 
+date-format: long
+# bibliography: manual-refs.bib
+format:
   html:
+    resources:
+      - reference-backlinks.js
+    include-after-body:    
+      - text: |
+          # <script type="text/javascript" src="reference-backlinks.js"></script>
+    default: true         
+    code-copy: true
+    code-link: true        # This adds individual buttons
+    code-fold: true        # Hide code by default, show on click
+    code-summary: "Show the code"
+    code-overflow: wrap
+    code-block-bg: "#FAEBD7"
+    code-block-border-left: "#31BAE9"
+    # embed-resources: true
+    include-in-header: header.html
+    css:
+      - swart.css
+      - tachyons.min.css
+      - r-colors.css
+    fontsize: 18pt
+    lightbox: true
+    page-layout: full
+    fig-width: 12
+    fig-height: 10
+    fig-dpi: 300
+    html-math-method: katex
+    df-print: paged
     toc: true
-    toc-depth: 3
-    code-fold: false
-    theme: cosmo
-  pdf:
+    toc-float: true
+    citeproc: true
+    link-citations: true
+    linestretch: 1.0
+    
+    
+    
+  typst:
+    fig-width: 12
+    fig-height: 10
+    fig-dpi: 300
+    margin:
+      x: 1in
+      y: 1in
     toc: true
-    number-sections: true
-editor: visual
+    fontsize: 14pt
+    # mainfont: "Cabin"
+    
+  revealjs:
+    slide-number: true
+    transition: fade
+    code-overflow: wrap
+    center: true
+    smaller: true
+    scrollable: true
+    chalkboard: true
+    multiplex: false
+    theme: solarized
+    reference-location: margin
+    logo: img/red-cross-640-435.png
+    footer: "Footer text"
+    code-block-height: 650px
+
+
+
+  # docx:
+  #   highlight-style: github
+  #   fig_caption: true
+
+
+
+editor: source
+
+quarto:
+  render:
+    cache-refresh: true
+
+
+# for .qmd filesd
+execute:
+  echo: true
+  message: false
+  warning: false
+  eval: true
+  fig-width: 12
+  fig-height: 10
+
+
+# for .rmd files
+knitr:
+  opts_chunk:
+    echo: true
+    error: false
+    warning: false
+    message: false
+    eval: true
+    cache: false
+
 ---
+
+
+```{r}
+#| label: setup
+#| include: false
+
+# Prevent scientific notation globally
+options(scipen = 999)
+
+
+options(tigris_use_cache = TRUE)
+
+# install.packages(c("mapview", "survey", "srvyr", "arcgislayers"))
+
+# census_api_key("95496766c51541ee6f402c1e1a8658581285b759", install = TRUE, overwrite = TRUE)
+
+
+# For me, I ALWAYS begin with the most recent development version of TidyCensus
+remotes::install_github("walkerke/tidycensus")
+
+# load libraries
+
+# library(readxl)
+# library(writexl) 
+# library(tidyr) 
+# library(readr) 
+# library(purrr) 
+# library(stringr) 
+# library(forcats) 
+# library(lubridate) 
+# library(janitor) 
+# library(ggtext) 
+# library(paletteer) 
+# library(viridis) 
+# library(RColorBrewer) 
+# library(wesanderson) 
+# library(dutchmasters) 
+# library(gghighlight) 
+# library(monochromeR) 
+# library(ggforce) 
+# library(ggthemes)
+# library(gt)
+# library(gtExtras)
+# library(tidyverse)
+# library(plotly)
+# library(ggplot2)
+# library(tibble)
+# library(patchwork)
+# library(ppcor)
+# library(ggplot2)
+# library(corrplot)
+# library(ggcorrplot)
+# library(car)
+# library(WRS2)
+# library(boot)
+# library(BayesFactor)
+# library(pwr)
+# library(qgraph)
+# library(scales)
+# library(here)
+# library(ggdag)      # For plotting DAGs
+# library(dagitty)    # For working with DAG logic
+# library(DiagrammeR) # For complete control of the layout
+# library(knitr)      # For controlling rendering
+# library(kableExtra) # For tables summarizing results
+library(DT)         # For rendering tables that kableExtra cannot (e.g., symbols)
+# library(lavaan)     # For latent variable analysis
+# library(ggpubr)
+# library(rethinking)
+# library(broom)
+
+library(tidyverse)
+library(tidycensus)
+
+
+# Force dplyr's select to take precedence
+select <- dplyr::select
+filter <- dplyr::filter
+
+# Set global theme for consistent plots
+theme_set(theme_minimal(base_size = 20) + 
+          theme(
+    plot.title = element_text(face = "bold", size = 26),    # adjust title size
+    plot.subtitle = element_text(face = "bold", size = 24), # adjust subtitle size
+    axis.title.x = element_text(face = "bold", size = 22),
+    axis.title.y = element_text(face = "bold", size = 22),
+    axis.text.x = element_text(face = "bold", size = 22, angle = 45, hjust = 1),
+    legend.position = "bottom",
+    strip.text = element_text(face = "bold"),
+    panel.spacing.x = unit(1.5, "cm"),  # Horizontal spacing only
+    panel.spacing.y = unit(1.5, "cm"),   # Vertical spacing only
+    plot.margin = margin(20, 20, 20, 20, "pt")
+    )
+)
+
+
+# Set seed for reproducibility
+set.seed(123)
+
+```
 
 ## Overview
 
 This workflow demonstrates strategies for finding American Community Survey (ACS) tables that contain multiple demographic characteristics simultaneously, specifically focusing on:
 
-- Earnings/Income
-- Sex 
-- Marital Status
-- Occupation
-- Years of Experience
+-   Earnings/Income
+-   Sex
+-   Marital Status
+-   Occupation
+-   Years of Experience
 
-## Setup
 
-```{r setup, message=FALSE, warning=FALSE}
-library(tidycensus)
-library(tidyverse)
-library(DT)
-
-# Set your Census API key (get one at https://api.census.gov/data/key_signup.html)
-# census_api_key("YOUR_KEY_HERE", install = TRUE)
-```
 
 ## Step 1: Load All Available Variables
 
@@ -46,9 +232,12 @@ all_vars_5 <- load_variables(2023, "acs5")
 glimpse(all_vars_5)
 ```
 
+
+
 ## Step 2: Initial Exploration (The "Hail Mary" Approach)
 
 ```{r initial-search}
+
 # Original approach: search for all five variables in concept field
 all_variables <- all_vars_5 %>%
   filter(str_detect(concept, "earning|income") &
@@ -59,33 +248,342 @@ all_variables <- all_vars_5 %>%
 
 # Result: Zero matches (as expected)
 nrow(all_variables)
+
 ```
+
 
 **Reality Check:** This approach yields zero results because ACS tables typically organize data around 1-2 main dimensions, not five simultaneously.
 
+
+
 ## Step 3: Strategic Variable Discovery
 
-### 3.1 Search Both Concept AND Label Fields
+### 3.1 Search Concept AND Label Fields for each variable
+
+
+(***earnings*** × sex × marital status x occupation x years of experience)
+
+#### 'earnings|income|wage' - instances in dataframe
 
 ```{r search-both-fields}
-# Search for earnings/income in both concept and label
+
+# Look for any mention of your variables across both fields
 earnings_vars <- all_vars_5 %>%
   filter(str_detect(tolower(concept), "earning|income|wage") | 
          str_detect(tolower(label), "earning|income|wage"))
 
-# Examine unique concepts for earnings
+  View(earnings_vars)
+
+  
+# Check what concepts exist
 earnings_concepts <- earnings_vars %>% 
   distinct(concept) %>%
   arrange(concept)
 
+  View(earnings_concepts)
+
+
+# Check what labels exist
+earnings_labels <- earnings_vars %>% 
+  distinct(label) %>% 
+  arrange(label)
+
+  View(earnings_labels)
+
 print(paste("Found", nrow(earnings_concepts), "different earnings-related concepts"))
+
 ```
 
-```{r display-earnings-concepts}
+Results:  8765 obs. of 4 variables
+
+
+Display results in DT Tables
+
+```{r display-earnings-concepts-and-labels}
 # Display earnings concepts
 earnings_concepts %>%
   DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
+
+# Display earnings labels
+earnings_labels %>%
+  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
+
 ```
+
+
+
+
+(earnings × ***sex*** × marital status x occupation x years of experience)
+
+#### 'sex' - instances in dataframe
+
+```{r}
+
+# Look for any mention of your variables across both fields
+sex_vars <- all_vars_5 %>%
+  filter(str_detect(tolower(concept), "sex") | 
+         str_detect(tolower(label), "sex"))
+
+  View(sex_vars)
+
+  
+# Check what concepts exist
+sex_concepts <- sex_vars %>% 
+  distinct(concept) %>%
+  arrange(concept)
+
+  View(sex_concepts)
+
+
+# Check what labels exist
+sex_labels <- sex_vars %>% 
+  distinct(label) %>% 
+  arrange(label)
+
+  View(sex_labels)
+
+print(paste("Found", nrow(sex_concepts), "different sex-related concepts"))
+
+```
+
+Results:  6845 obs. of 4 variables
+
+
+Display results in DT Tables
+
+```{r display-earnings-concepts-and-labels}
+# Display earnings concepts
+sex_concepts %>%
+  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
+
+# Display earnings labels
+sex_labels %>%
+  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
+
+```
+
+
+
+
+
+(earnings × sex × ***marital status*** x occupation x years of experience)
+
+#### 'marital status' - instances in dataframe
+
+```{r}
+
+# Look for any mention of your variables across both fields
+marital_vars <- all_vars_5 %>%
+  filter(str_detect(tolower(concept), "marital") | 
+         str_detect(tolower(label), "marital"))
+
+  View(marital_vars)
+
+  
+# Check what concepts exist
+marital_concepts <- marital_vars %>% 
+  distinct(concept) %>%
+  arrange(concept)
+
+  View(marital_concepts)
+
+
+# Check what labels exist
+marital_labels <- marital_vars %>% 
+  distinct(label) %>% 
+  arrange(label)
+
+  View(marital_labels)
+
+print(paste("Found", nrow(marital_concepts), "different marital-related concepts"))
+
+```
+
+Results:  918 obs. of 4 variables
+
+
+Display results in DT Tables
+
+```{r display-earnings-concepts-and-labels}
+# Display earnings concepts
+marital_concepts %>%
+  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
+
+# Display earnings labels
+marital_labels %>%
+  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
+
+```
+
+
+
+
+
+
+
+(earnings × sex × marital status x ***occupation*** x years of experience)
+
+#### 'occupation' - instances in dataframe
+
+```{r}
+
+# Look for any mention of your variables across both fields
+occupation_vars <- all_vars_5 %>%
+  filter(str_detect(tolower(concept), "occupation") | 
+         str_detect(tolower(label), "occupation"))
+
+  View(occupation_vars)
+
+  
+# Check what concepts exist
+occupation_concepts <- occupation_vars %>% 
+  distinct(concept) %>%
+  arrange(concept)
+
+  View(occupation_concepts)
+
+
+# Check what labels exist
+occupation_labels <- occupation_vars %>% 
+  distinct(label) %>% 
+  arrange(label)
+
+  View(occupation_labels)
+
+print(paste("Found", nrow(occupation_concepts), "different occupation-related concepts"))
+
+```
+
+Results:  5843 obs. of 4 variables
+
+
+Display results in DT Tables
+
+```{r display-earnings-concepts-and-labels}
+# Display earnings concepts
+occupation_concepts %>%
+  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
+
+# Display earnings labels
+occupation_labels %>%
+  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
+
+```
+
+
+
+
+
+
+
+
+(earnings × sex × marital status x occupation x ***years of experience***)
+
+#### 'experience' - instances in dataframe
+
+```{r}
+
+# Look for any mention of your variables across both fields
+experience_vars <- all_vars_5 %>%
+  filter(str_detect(tolower(concept), "experience") | 
+         str_detect(tolower(label), "experience"))
+
+  View(experience_vars)
+
+  
+# Check what concepts exist
+experience_concepts <- experience_vars %>% 
+  distinct(concept) %>%
+  arrange(concept)
+
+  View(experience_concepts)
+
+
+# Check what labels exist
+experience_labels <- experience_vars %>% 
+  distinct(label) %>% 
+  arrange(label)
+
+  View(experience_labels)
+
+print(paste("Found", nrow(experience_concepts), "different experience-related concepts"))
+
+```
+
+Results:  1295 obs. of 4 variables
+
+
+Display results in DT Tables
+
+```{r display-earnings-concepts-and-labels}
+# Display earnings concepts
+experience_concepts %>%
+  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
+
+# Display earnings labels
+experience_labels %>%
+  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
+
+```
+
+
+
+
+#### 'never_married' - instances in dataframe
+
+```{r}
+
+# Look for any mention of your variables across both fields
+never_married_vars <- all_vars_5 %>%
+  filter(str_detect(tolower(concept), "never married") | 
+         str_detect(tolower(label), "never married"))
+
+  View(never_married_vars)
+
+  
+# Check what concepts exist
+never_married_concepts <- never_married_vars %>% 
+  distinct(concept) %>%
+  arrange(concept)
+
+  View(never_married_concepts)
+
+
+# Check what labels exist
+never_married_labels <- never_married_vars %>% 
+  distinct(label) %>% 
+  arrange(label)
+
+  View(never_married_labels)
+
+print(paste("Found", nrow(never_married_concepts), "different never_married-related concepts"))
+
+```
+
+Results:  186 obs. of 4 variables
+
+
+Display results in DT Tables
+
+```{r display-earnings-concepts-and-labels}
+# Display earnings concepts
+never_married_concepts %>%
+  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
+
+# Display earnings labels
+never_married_labels %>%
+  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
+
+```
+
+
+### Conclusion:  there is no way to isolate a 'never-married female' from the 'never-married, widowed, or divorced' females.  They are lumped together.  NOT WHAT I'M LOOKING FOR IN THIS STUDY.
+
+
+
+
+
+
 
 ### 3.2 Search for Combinations of 2-3 Variables
 
@@ -235,18 +733,18 @@ earnings_by_sex <- get_acs(
 
 ## Next Steps
 
-1. **Prioritize Your Variables**: Identify which 2-3 characteristics are most important
-2. **Consider PUMS**: For maximum flexibility in cross-tabulations
-3. **Geographic Level**: Decide on appropriate geographic granularity
-4. **Margin of Error**: Plan for uncertainty quantification in combined estimates
-5. **Validation**: Cross-check results with multiple data sources when possible
+1.  **Prioritize Your Variables**: Identify which 2-3 characteristics are most important
+2.  **Consider PUMS**: For maximum flexibility in cross-tabulations
+3.  **Geographic Level**: Decide on appropriate geographic granularity
+4.  **Margin of Error**: Plan for uncertainty quantification in combined estimates
+5.  **Validation**: Cross-check results with multiple data sources when possible
 
 ## Resources
 
-- [TidyCensus Documentation](https://walker-data.com/tidycensus/)
-- [Census Table Finder](https://data.census.gov/cedsci/)
-- [ACS Technical Documentation](https://www.census.gov/programs-surveys/acs/technical-documentation.html)
-- [PUMS Data Dictionary](https://www.census.gov/programs-surveys/acs/microdata/documentation.html)
+-   [TidyCensus Documentation](https://walker-data.com/tidycensus/)
+-   [Census Table Finder](https://data.census.gov/cedsci/)
+-   [ACS Technical Documentation](https://www.census.gov/programs-surveys/acs/technical-documentation.html)
+-   [PUMS Data Dictionary](https://www.census.gov/programs-surveys/acs/microdata/documentation.html)
 
 ## Step 7: Finding Which Table Contains Each Variable
 

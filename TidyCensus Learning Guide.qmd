@@ -232,7 +232,7 @@ The Census Bureau typically organizes tables around 1-2 main dimensions, not fiv
 all_vars_5 <- load_variables(2023, "acs5")
 
 
-# Look for any mention of your variables across both fields
+# Look for any mention of your variable across both fields
 earnings_vars <- all_vars_5 %>%
   filter(str_detect(tolower(concept), "earning|income") | 
          str_detect(tolower(label), "earning|income"))
