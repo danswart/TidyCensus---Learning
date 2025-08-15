@@ -83,10 +83,6 @@ format:
 
 editor: source
 
-quarto:
-  render:
-    cache-refresh: true
-
 
 # for .qmd filesd
 execute:

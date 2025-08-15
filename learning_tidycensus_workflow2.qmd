@@ -216,7 +216,7 @@ This workflow demonstrates strategies for finding American Community Survey (ACS
 
 -   Earnings/Income
 -   Sex
--   Marital Status
+-   Marital Status (never married, not including divorced or widowed)
 -   Occupation
 -   Years of Experience
 
@@ -231,6 +231,9 @@ all_vars_5 <- load_variables(2023, "acs5")
 # Examine structure
 glimpse(all_vars_5)
 ```
+
+Results:  28,261 obs. of 4 variables
+
 
 
 
@@ -256,282 +259,22 @@ nrow(all_variables)
 
 
 
+
 ## Step 3: Strategic Variable Discovery
 
 ### 3.1 Search Concept AND Label Fields for each variable
 
+#### If you happen to know the critical characteristic in advance (such as a replication study) you can search for that characteristic first.
 
-(***earnings*** × sex × marital status x occupation x years of experience)
-
-#### 'earnings|income|wage' - instances in dataframe
-
-```{r search-both-fields}
-
-# Look for any mention of your variables across both fields
-earnings_vars <- all_vars_5 %>%
-  filter(str_detect(tolower(concept), "earning|income|wage") | 
-         str_detect(tolower(label), "earning|income|wage"))
-
-  View(earnings_vars)
-
-  
-# Check what concepts exist
-earnings_concepts <- earnings_vars %>% 
-  distinct(concept) %>%
-  arrange(concept)
-
-  View(earnings_concepts)
+In this case it as 'females, never-married'
 
 
-# Check what labels exist
-earnings_labels <- earnings_vars %>% 
-  distinct(label) %>% 
-  arrange(label)
-
-  View(earnings_labels)
-
-print(paste("Found", nrow(earnings_concepts), "different earnings-related concepts"))
-
-```
-
-Results:  8765 obs. of 4 variables
-
-
-Display results in DT Tables
-
-```{r display-earnings-concepts-and-labels}
-# Display earnings concepts
-earnings_concepts %>%
-  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
-
-# Display earnings labels
-earnings_labels %>%
-  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
-
-```
-
-
-
-
-(earnings × ***sex*** × marital status x occupation x years of experience)
-
-#### 'sex' - instances in dataframe
+#### Search for 'never_married' - instances in dataframe
 
 ```{r}
 
-# Look for any mention of your variables across both fields
-sex_vars <- all_vars_5 %>%
-  filter(str_detect(tolower(concept), "sex") | 
-         str_detect(tolower(label), "sex"))
-
-  View(sex_vars)
-
-  
-# Check what concepts exist
-sex_concepts <- sex_vars %>% 
-  distinct(concept) %>%
-  arrange(concept)
-
-  View(sex_concepts)
-
-
-# Check what labels exist
-sex_labels <- sex_vars %>% 
-  distinct(label) %>% 
-  arrange(label)
-
-  View(sex_labels)
-
-print(paste("Found", nrow(sex_concepts), "different sex-related concepts"))
-
-```
-
-Results:  6845 obs. of 4 variables
-
-
-Display results in DT Tables
-
-```{r display-earnings-concepts-and-labels}
-# Display earnings concepts
-sex_concepts %>%
-  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
-
-# Display earnings labels
-sex_labels %>%
-  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
-
-```
-
-
-
-
-
-(earnings × sex × ***marital status*** x occupation x years of experience)
-
-#### 'marital status' - instances in dataframe
-
-```{r}
-
-# Look for any mention of your variables across both fields
-marital_vars <- all_vars_5 %>%
-  filter(str_detect(tolower(concept), "marital") | 
-         str_detect(tolower(label), "marital"))
-
-  View(marital_vars)
-
-  
-# Check what concepts exist
-marital_concepts <- marital_vars %>% 
-  distinct(concept) %>%
-  arrange(concept)
-
-  View(marital_concepts)
-
-
-# Check what labels exist
-marital_labels <- marital_vars %>% 
-  distinct(label) %>% 
-  arrange(label)
-
-  View(marital_labels)
-
-print(paste("Found", nrow(marital_concepts), "different marital-related concepts"))
-
-```
-
-Results:  918 obs. of 4 variables
-
-
-Display results in DT Tables
-
-```{r display-earnings-concepts-and-labels}
-# Display earnings concepts
-marital_concepts %>%
-  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
-
-# Display earnings labels
-marital_labels %>%
-  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
-
-```
-
-
-
-
-
-
-
-(earnings × sex × marital status x ***occupation*** x years of experience)
-
-#### 'occupation' - instances in dataframe
-
-```{r}
-
-# Look for any mention of your variables across both fields
-occupation_vars <- all_vars_5 %>%
-  filter(str_detect(tolower(concept), "occupation") | 
-         str_detect(tolower(label), "occupation"))
-
-  View(occupation_vars)
-
-  
-# Check what concepts exist
-occupation_concepts <- occupation_vars %>% 
-  distinct(concept) %>%
-  arrange(concept)
-
-  View(occupation_concepts)
-
-
-# Check what labels exist
-occupation_labels <- occupation_vars %>% 
-  distinct(label) %>% 
-  arrange(label)
-
-  View(occupation_labels)
-
-print(paste("Found", nrow(occupation_concepts), "different occupation-related concepts"))
-
-```
-
-Results:  5843 obs. of 4 variables
-
-
-Display results in DT Tables
-
-```{r display-earnings-concepts-and-labels}
-# Display earnings concepts
-occupation_concepts %>%
-  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
-
-# Display earnings labels
-occupation_labels %>%
-  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
-
-```
-
-
-
-
-
-
-
-
-(earnings × sex × marital status x occupation x ***years of experience***)
-
-#### 'experience' - instances in dataframe
-
-```{r}
-
-# Look for any mention of your variables across both fields
-experience_vars <- all_vars_5 %>%
-  filter(str_detect(tolower(concept), "experience") | 
-         str_detect(tolower(label), "experience"))
-
-  View(experience_vars)
-
-  
-# Check what concepts exist
-experience_concepts <- experience_vars %>% 
-  distinct(concept) %>%
-  arrange(concept)
-
-  View(experience_concepts)
-
-
-# Check what labels exist
-experience_labels <- experience_vars %>% 
-  distinct(label) %>% 
-  arrange(label)
-
-  View(experience_labels)
-
-print(paste("Found", nrow(experience_concepts), "different experience-related concepts"))
-
-```
-
-Results:  1295 obs. of 4 variables
-
-
-Display results in DT Tables
-
-```{r display-earnings-concepts-and-labels}
-# Display earnings concepts
-experience_concepts %>%
-  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
-
-# Display earnings labels
-experience_labels %>%
-  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
-
-```
-
-
-
-
-#### 'never_married' - instances in dataframe
-
-```{r}
+# Load all ACS 5-year variables for 2023
+all_vars_5 <- load_variables(2023, "acs5")
 
 # Look for any mention of your variables across both fields
 never_married_vars <- all_vars_5 %>%
@@ -546,7 +289,7 @@ never_married_concepts <- never_married_vars %>%
   distinct(concept) %>%
   arrange(concept)
 
-  View(never_married_concepts)
+  # View(never_married_concepts)
 
 
 # Check what labels exist
@@ -554,31 +297,292 @@ never_married_labels <- never_married_vars %>%
   distinct(label) %>% 
   arrange(label)
 
-  View(never_married_labels)
+  # View(never_married_labels)
 
 print(paste("Found", nrow(never_married_concepts), "different never_married-related concepts"))
+
+
+# Display earnings concepts in a table
+never_married_concepts %>%
+  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
+
+# Display earnings labels in a table
+never_married_labels %>%
+  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
+
 
 ```
 
 Results:  186 obs. of 4 variables
 
 
-Display results in DT Tables
 
-```{r display-earnings-concepts-and-labels}
+
+### Conclusion:  There may be no way to isolate a 'never-married female' from the 'never-married, widowed, or divorced' females for my categories of interest.  They seem lumped together.  
+
+***If this doesn't work:  Try the PUMS dataframe from U.S. Census***
+
+
+
+
+### Investigate the other variables needed
+
+(***earnings*** × sex × marital status x occupation x years of experience)
+
+#### 'earnings|income|wage' - instances in dataframe
+
+```{r search-both-fields}
+
+# Load all ACS 5-year variables for 2023
+all_vars_5 <- load_variables(2023, "acs5")
+
+# Look for any mention of your variables across both fields
+earnings_vars <- all_vars_5 %>%
+  filter(str_detect(tolower(concept), "earning|income|wage") | 
+         str_detect(tolower(label), "earning|income|wage"))
+
+  View(earnings_vars)
+
+  
+# Check what concepts exist
+earnings_concepts <- earnings_vars %>% 
+  distinct(concept) %>%
+  arrange(concept)
+
+  # View(earnings_concepts)
+
+
+# Check what labels exist
+earnings_labels <- earnings_vars %>% 
+  distinct(label) %>% 
+  arrange(label)
+
+  # View(earnings_labels)
+
+print(paste("Found", nrow(earnings_concepts), "different earnings-related concepts"))
+
+
+# Display earnings concepts in table
+earnings_concepts %>%
+  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
+
+# Display earnings labels in table
+earnings_labels %>%
+  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
+
+
+```
+
+Results:  8765 obs. of 4 variables
+
+
+
+
+
+
+(earnings × ***sex*** × marital status x occupation x years of experience)
+
+#### 'sex' - instances in dataframe
+
+```{r}
+
+# Load all ACS 5-year variables for 2023
+all_vars_5 <- load_variables(2023, "acs5")
+
+# Look for any mention of your variables across both fields
+sex_vars <- all_vars_5 %>%
+  filter(str_detect(tolower(concept), "sex") | 
+         str_detect(tolower(label), "sex"))
+
+  View(sex_vars)
+
+  
+# Check what concepts exist
+sex_concepts <- sex_vars %>% 
+  distinct(concept) %>%
+  arrange(concept)
+
+  # View(sex_concepts)
+
+
+# Check what labels exist
+sex_labels <- sex_vars %>% 
+  distinct(label) %>% 
+  arrange(label)
+
+ # View(sex_labels)
+
+print(paste("Found", nrow(sex_concepts), "different sex-related concepts"))
+
+
 # Display earnings concepts
-never_married_concepts %>%
+sex_concepts %>%
   DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
 
 # Display earnings labels
-never_married_labels %>%
+sex_labels %>%
+  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
+
+
+```
+
+Results:  6845 obs. of 4 variables
+
+
+
+
+
+(earnings × sex × ***marital status*** x occupation x years of experience)
+
+#### 'marital status' - instances in dataframe
+
+```{r}
+
+# Load all ACS 5-year variables for 2023
+all_vars_5 <- load_variables(2023, "acs5")
+
+# Look for any mention of your variables across both fields
+marital_vars <- all_vars_5 %>%
+  filter(str_detect(tolower(concept), "marital") | 
+         str_detect(tolower(label), "marital"))
+
+  View(marital_vars)
+
+  
+# Check what concepts exist
+marital_concepts <- marital_vars %>% 
+  distinct(concept) %>%
+  arrange(concept)
+
+  # View(marital_concepts)
+
+
+# Check what labels exist
+marital_labels <- marital_vars %>% 
+  distinct(label) %>% 
+  arrange(label)
+
+  # View(marital_labels)
+
+print(paste("Found", nrow(marital_concepts), "different marital-related concepts"))
+
+
+# Display results in DT Tables
+marital_concepts %>%
+  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
+
+marital_labels %>%
   DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
 
 ```
 
+Results:  918 obs. of 4 variables
 
-### Conclusion:  there is no way to isolate a 'never-married female' from the 'never-married, widowed, or divorced' females.  They are lumped together.  NOT WHAT I'M LOOKING FOR IN THIS STUDY.
 
+
+
+
+
+
+(earnings × sex × marital status x ***occupation*** x years of experience)
+
+#### 'occupation' - instances in dataframe
+
+```{r}
+
+# Load all ACS 5-year variables for 2023
+all_vars_5 <- load_variables(2023, "acs5")
+
+# Look for any mention of your variables across both fields
+occupation_vars <- all_vars_5 %>%
+  filter(str_detect(tolower(concept), "occupation") | 
+         str_detect(tolower(label), "occupation"))
+
+  View(occupation_vars)
+
+  
+# Check what concepts exist
+occupation_concepts <- occupation_vars %>% 
+  distinct(concept) %>%
+  arrange(concept)
+
+  # View(occupation_concepts)
+
+
+# Check what labels exist
+occupation_labels <- occupation_vars %>% 
+  distinct(label) %>% 
+  arrange(label)
+
+  # View(occupation_labels)
+
+print(paste("Found", nrow(occupation_concepts), "different occupation-related concepts"))
+
+
+# Display results in DT Tables
+occupation_concepts %>%
+  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
+
+
+occupation_labels %>%
+  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
+
+
+```
+
+Results:  5843 obs. of 4 variables
+
+
+
+
+
+
+
+(earnings × sex × marital status x occupation x ***years of experience***)
+
+#### 'experience' - instances in dataframe
+
+```{r}
+
+# Load all ACS 5-year variables for 2023
+all_vars_5 <- load_variables(2023, "acs5")
+
+# Look for any mention of your variables across both fields
+experience_vars <- all_vars_5 %>%
+  filter(str_detect(tolower(concept), "experience") | 
+         str_detect(tolower(label), "experience"))
+
+  View(experience_vars)
+
+  
+# Check what concepts exist
+experience_concepts <- experience_vars %>% 
+  distinct(concept) %>%
+  arrange(concept)
+
+  # View(experience_concepts)
+
+
+# Check what labels exist
+experience_labels <- experience_vars %>% 
+  distinct(label) %>% 
+  arrange(label)
+
+  # View(experience_labels)
+
+print(paste("Found", nrow(experience_concepts), "different experience-related concepts"))
+
+
+# Display results in DT Tables
+experience_concepts %>%
+  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
+
+experience_labels %>%
+  DT::datatable(options = list(pageLength = 10, scrollX = TRUE))
+
+```
+
+Results:  1295 obs. of 4 variables
 
 
 
