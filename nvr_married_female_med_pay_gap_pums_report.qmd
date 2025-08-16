@@ -1,6 +1,6 @@
 ---
-title: "Texas Pay Gap Analysis: Never-Married Females vs Males by Occupation"
-subtitle: ""
+title: "Texas Pay Gap Analysis: Never-Married Females vs Males"
+subtitle: "By Selected Occupation"
 description: ""
 author: 
   - name: "Dan Swart, CPA (ret)"
@@ -20,7 +20,7 @@ format:
     default: true         
     code-copy: true
     code-link: true        # This adds individual buttons
-    code-fold: true        # Hide code by default, show on click
+    code-fold: true        # True = hide code by default, show on click
     code-summary: "Show the code"
     code-overflow: wrap
     code-block-bg: "#FAEBD7"
@@ -101,6 +101,10 @@ This report analyzes **mean (average) earnings** differences between never-marri
 
 **Key Focus:** All analysis uses **mean income** rather than median to capture the full earning potential and account for high earners in each occupation.
 
+
+***Run > library(tidycensus) and View(pums_variables) in the console at anytime to query the entire PUMS variables dataframe)***
+
+
 ```{r setup}
 #| include: false
 library(tidycensus)
@@ -121,13 +125,94 @@ if (!dir.exists("cache_data")) {
 }
 
 knitr::opts_chunk$set(
-  echo = FALSE,
-  warning = FALSE,
+  echo = TRUE,
+  warning = TRUE,
   message = FALSE,
   fig.width = 10,
   fig.height = 6
 )
+
+
+# The smart_table() function; user supplies title text
+
+smart_table <- function(data, title = NULL, pageLength = 10, col.names = NULL, ...) {
+  
+  # Print the title if provided
+  if (!is.null(title)) {
+    
+      cat(title, 
+        "\n\n")
+    
+    # cat("###", 
+    #     title, 
+    #     "\n\n")
+    
+  }
+  
+  if (knitr::is_html_output()) {
+    
+    # HTML → interactive DT table
+    DT::datatable(
+      data,
+      colnames = col.names,
+      options = list(
+        pageLength = pageLength,
+        autoWidth = TRUE
+      ),
+      ...
+    )
+    
+  } else if (knitr::is_latex_output()) {
+    
+    # PDF → LaTeX table with booktabs
+    knitr::kable(
+      data,
+      col.names = col.names,
+      format = "latex",
+      booktabs = TRUE,
+      ...
+    )
+    
+  } else if (knitr::pandoc_to("typst")) {
+    
+    # Typst → pipe table with bold headers + alternating row shading
+    df <- data
+    if (!is.null(col.names)) {
+      colnames(df) <- col.names
+    }
+    
+    # Bold headers
+    colnames(df) <- paste0("**", colnames(df), "**")
+    
+    # Alternating row shading for Typst
+    for (i in seq_len(nrow(df))) {
+      if (i %% 2 == 0) {
+        df[i, ] <- paste0("`#set fill(0.9)` ", df[i, ])
+      }
+    }
+    
+    knitr::kable(
+      df,
+      format = "pipe",
+      ...
+    )
+    
+  } else {
+    
+    # Fallback → plain text table
+    knitr::kable(
+      data,
+      col.names = col.names,
+      format = "simple",
+      ...
+    )
+  }
+}
+
+
 ```
+
+
 
 # Data Collection and Processing
 
@@ -155,8 +240,13 @@ cat("=== STATUS CHECK COMPLETE ===\n\n")
 
 ```{r data-collection}
 #| cache: true
+#| echo: true
+#| output: false
+#| message: false
 
-# Add timestamp and progress indicators
+
+
+# Add time stamp and progress indicators
 cat("=== DATA COLLECTION STARTED ===\n")
 cat("Timestamp:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
 cat("Cache directory exists:", dir.exists("cache_data"), "\n")
@@ -236,6 +326,10 @@ cat("Proceeding to data filtering...\n\n")
 
 ```{r data-filtering}
 #| cache: true
+#| echo: true
+#| output: false
+#| message: false
+
 
 cat("=== DATA FILTERING STARTED ===\n")
 cat("Timestamp:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
@@ -323,9 +417,12 @@ sample_summary <- data.frame(
   Criteria = c("Never married, positive earnings", "All marital status, positive earnings")
 )
 
-kable(sample_summary, 
-      caption = "Sample Composition",
-      col.names = c("Group", "Sample Size", "Age Range", "Selection Criteria"))
+
+smart_table(sample_summary,
+            title = "Sample Composition",
+            col.names = c("Group", "Sample Size", "Age Range", "Selection Criteria"))
+
+
 ```
 
 # Occupation Search and Query Functions
@@ -345,6 +442,7 @@ search_occupation <- function(search_term, data = female_never_married) {
     return(NULL)
   }
   
+  
   # Calculate stats for matching occupations
   occupation_stats <- data %>%
     dplyr::filter(stringr::str_detect(OCCP_label, stringr::regex(search_term, ignore_case = TRUE))) %>%
@@ -360,6 +458,7 @@ search_occupation <- function(search_term, data = female_never_married) {
   
   return(occupation_stats)
 }
+
 
 # Function to get detailed comparison for specific occupation
 get_occupation_comparison <- function(occupation_pattern, data = combined_data) {
@@ -399,6 +498,7 @@ get_occupation_comparison <- function(occupation_pattern, data = combined_data) 
 Let's investigate specific medical occupations and their earnings:
 
 ```{r physician-investigation}
+
 # Search for physician-related occupations
 cat("=== SEARCHING FOR PHYSICIAN-RELATED OCCUPATIONS ===\n")
 
@@ -420,7 +520,8 @@ if (!is.null(physician_results)) {
       `Median Earnings` = median_earnings
     )
   
-  print(kable(physician_formatted, caption = "Physician-Related Occupations (Never-Married Females)"))
+  smart_table(physician_formatted,
+              title = "'Physician' Related Occupations Used (Never-Married Females)")
 } else {
   cat("No physician occupations found in the data.\n")
 }
@@ -429,17 +530,47 @@ if (!is.null(physician_results)) {
 cat("\n=== SEARCHING FOR OTHER MEDICAL OCCUPATIONS ===\n")
 
 medical_terms <- c("doctor", "medical", "surgeon", "practitioner")
+
 for (term in medical_terms) {
+  cat("\n=== Testing term: '", term, "' ===\n", sep = "")
+  
   results <- search_occupation(term, female_never_married)
+  
+  cat("Results is NULL:", is.null(results), "\n")
+  if (!is.null(results)) {
+    cat("Results has", nrow(results), "rows\n")
+  } else {
+    cat("Search returned NULL for term:", term, "\n")
+    next
+  }
+  
   if (!is.null(results) && nrow(results) > 0) {
-    cat("\nFound", nrow(results), "occupations matching '", term, "':\n", sep = "")
-    top_result <- results %>% dplyr::slice_head(n = 3)
-    for (i in 1:nrow(top_result)) {
-      cat("- ", top_result$OCCP_label[i], ": ", dollar(top_result$mean_earnings[i]), 
-          " (n=", round(top_result$count[i]), ")\n", sep = "")
+    cat("Found ", nrow(results), " occupations matching '", term, "':\n", sep = "")
+    top_result <- results %>% dplyr::slice_head(n = 20)
+    
+    cat("top_result created with", nrow(top_result), "rows\n")
+    
+    if (nrow(top_result) > 0) {
+      cat("DEBUG: First few OCCP_label values:\n")
+      for (i in 1:min(3, nrow(top_result))) {
+        cat("Row", i, ": '", as.character(top_result$OCCP_label[i]), "'\n", sep = "")
+      }
+      cat("\n")
+      
+      for (i in 1:nrow(top_result)) {
+        cat("- ", as.character(top_result$OCCP_label[i]), ": ", dollar(top_result$mean_earnings[i]), 
+            " (n=", round(top_result$count[i]), ")\n", sep = "")
+      }
+    } else {
+      cat("top_result has 0 rows\n")
     }
+  } else {
+    cat("No results found for term:", term, "\n")
   }
 }
+
+cat("\n=== End of medical terms search ===\n")
+
 ```
 
 # Analysis Functions
@@ -538,6 +669,9 @@ calculate_pay_gap <- function(data, occupation_filter = NULL) {
 
 ```{r top-occupations}
 #| cache: true
+#| echo: true
+#| output: false
+#| message: false
 
 # Check if top occupations analysis exists
 if (file.exists("cache_data/top_occupations.rds")) {
@@ -611,6 +745,10 @@ ggplotly(top_15_plot, tooltip = c("x", "y"))
 
 ```{r overall-analysis}
 #| cache: true
+#| echo: true
+#| output: false
+#| message: false
+
 
 # Check if overall analysis exists
 if (file.exists("cache_data/overall_gap.rds")) {
@@ -642,9 +780,11 @@ if (!is.null(overall_gap) && !is.null(overall_gap$mean_gap_dollars)) {
     )
   )
   
-  kable(overall_summary,
-        caption = "Overall Pay Gap: Never-Married Females vs All Males (Texas, Age 25-64) - MEAN EARNINGS",
+  smart_table(overall_summary,
+        title = "Overall Pay Gap: Never-Married Females vs All Males (Texas, Age 25-64) - MEAN EARNINGS",
         col.names = c("Metric", "Value"))
+  
+  
 } else {
   cat("ERROR: Could not calculate overall pay gap. Check data and calculation function.\n")
   cat("Debug info:\n")
@@ -661,25 +801,65 @@ if (!is.null(overall_gap) && !is.null(overall_gap$mean_gap_dollars)) {
 
 ```{r occupation-analysis}
 #| cache: true
+#| echo: true
+
+
 
 # Check if occupation analysis exists
 if (file.exists("cache_data/occupation_results.rds")) {
   occupation_results <- readRDS("cache_data/occupation_results.rds")
 } else {
-  # Analyze specific occupations
-  occupations_to_test <- c("Physician", "Surgeon", "Lawyer", "Accountant", 
-                          "Engineer", "Teacher", "Nurse", "Manager")
   
-  occupation_results <- list()
-  for (occ in occupations_to_test) {
-    gap_result <- calculate_pay_gap(combined_data, occ)
-    if (!is.null(gap_result)) {
-      occupation_results[[occ]] <- gap_result
-    }
+  
+  # Analyze specific occupations
+occupations_to_test <- c("Physician", "Surgeon", "Lawyer", "Accountant", 
+                        "Engineer", "Teacher", "Nurse", "Manager", 
+                        "Dentist", "Pharmacist")  # Added these two
+
+occupation_results <- list()
+for (occ in occupations_to_test) {
+  cat("Testing occupation:", occ, "\n")
+  
+  # Check how many records match this occupation
+  matching_records <- combined_data %>%
+    dplyr::filter(stringr::str_detect(OCCP_label, stringr::regex(occ, ignore_case = TRUE)))
+  
+  cat("- Total matching records:", nrow(matching_records), "\n")
+  
+  if (nrow(matching_records) > 0) {
+    groups_in_data <- unique(matching_records$group)
+    cat("- Groups present:", toString(groups_in_data), "\n")
+    
+    group_counts <- matching_records %>%
+      dplyr::count(group)
+    print(group_counts)
   }
+  
+  gap_result <- calculate_pay_gap(combined_data, occ)
+  if (!is.null(gap_result)) {
+    occupation_results[[occ]] <- gap_result
+    cat("- Result: SUCCESS - added to results\n")
+  } else {
+    cat("- Result: FAILED - calculate_pay_gap returned NULL\n")
+  }
+  cat("\n")
+}
+  
+  # # Analyze specific occupations
+  # occupations_to_test <- c("Physician", "Surgeon", "Dentist", "Pharmacist", "Lawyer", "Accountant", 
+  #                         "Engineer", "Teacher", "Nurse", "Manager")
+  # 
+  # occupation_results <- list()
+  # for (occ in occupations_to_test) {
+  #   gap_result <- calculate_pay_gap(combined_data, occ)
+  #   if (!is.null(gap_result)) {
+  #     occupation_results[[occ]] <- gap_result
+  #   }
+  # }
   
   saveRDS(occupation_results, "cache_data/occupation_results.rds")
 }
+
 
 # Create summary table
 if (length(occupation_results) > 0) {
@@ -725,7 +905,8 @@ query_occupation <- function(search_term) {
       ) %>%
       dplyr::select(Occupation = OCCP_label, Count = count, `Mean Earnings` = mean_earnings)
     
-    print(kable(female_table))
+    smart_table(female_table)
+
     
     # Get comparison with males
     comparison <- get_occupation_comparison(search_term, combined_data)
@@ -738,7 +919,8 @@ query_occupation <- function(search_term) {
         ) %>%
         dplyr::select(Occupation = OCCP_label, Group = group, Count = count, `Mean Earnings` = mean_earnings)
       
-      print(kable(comp_table))
+      smart_table(comp_table)
+      
     }
   } else {
     cat("No results found for '", search_term, "'\n", sep = "")
@@ -753,6 +935,17 @@ query_occupation("Doctor")
 query_occupation("Surgeon")
 query_occupation("Dentist")
 query_occupation("Pharmacist")
+
+# Check sample sizes for dental/pharmacy occupations
+dental_check <- search_occupation("Dentist", female_never_married)
+if (!is.null(dental_check)) {
+  cat("Dentist sample size:", round(dental_check$count[1]), "\n")
+}
+
+pharmacy_check <- search_occupation("Pharmacist", female_never_married) 
+if (!is.null(pharmacy_check)) {
+  cat("Pharmacist sample size:", round(pharmacy_check$count[1]), "\n")
+}
 ```
 
 # Detailed Results by Occupation (Mean Earnings)
@@ -806,8 +999,10 @@ for (occ_name in names(occupation_results)) {
         )
       )
       
-      print(kable(detailed_table,
-                  col.names = c("Group", "Sample Size", "Mean Earnings")))
+      
+      smart_table(detailed_table,
+                  col.names = c("Group", "Sample Size", "Mean Earnings"))
+      
       
       cat("\n**Pay Gap Analysis (Mean Earnings):**\n")
       
@@ -840,6 +1035,9 @@ for (occ_name in names(occupation_results)) {
 
 ```{r never-married-comparison}
 #| cache: true
+#| echo: true
+#| output: false
+#| message: false
 
 # Check if never-married comparison exists
 if (file.exists("cache_data/comparable_analysis.rds")) {
@@ -899,9 +1097,12 @@ if (!is.null(comparable_gap) && !is.null(overall_gap) &&
     )
   )
   
-  kable(comparison_summary,
+  
+  smart_table(comparison_summary,
         caption = "Comparison of Different Analysis Approaches (MEAN EARNINGS)",
         col.names = c("Comparison", "Mean Gap (%)", "P-Value", "Significant?"))
+
+  
 } else {
   cat("Could not create comparison table due to missing data.\n")
   cat("Debug info:\n")
@@ -931,7 +1132,10 @@ if (length(cache_files) > 0) {
     Size_MB = round(file_info$size / 1024^2, 2),
     Modified = format(file_info$mtime, "%Y-%m-%d %H:%M")
   )
-  print(kable(cache_summary))
+ 
+  
+  smart_table(cache_summary)
+  
   
   total_size <- round(sum(file_info$size) / 1024^2, 1)
   cat("\nTotal cache size:", total_size, "MB\n")
@@ -962,7 +1166,9 @@ if (nrow(combined_data) > 0) {
     )
   
   cat("\nSimple group summary (without survey weights):\n")
-  print(kable(sample_calc))
+  
+  smart_table(sample_calc)
+  
   
   # Test the calculate_pay_gap function step by step
   cat("\n=== TESTING calculate_pay_gap FUNCTION ===\n")
@@ -990,7 +1196,9 @@ if (nrow(combined_data) > 0) {
       )
     
     cat("- Group stats calculated successfully\n")
-    print(kable(test_group_stats))
+    
+    smart_table(test_group_stats)
+    
     
     # Step 4: Test group indexing
     cat("\nStep 4 - Group indexing test:\n")
@@ -1054,7 +1262,7 @@ if (nrow(combined_data) > 0) {
 }
 ```
 
-# Key Findings (Mean Earnings Analysis)
+# Methodologies (Mean Earnings Analysis)
 
 Based on the PUMS data analysis using **mean earnings** for Texas working adults (ages 25-64):
 
@@ -1081,3 +1289,6 @@ Based on the PUMS data analysis using **mean earnings** for Texas working adults
 ---
 
 *Report generated on `r Sys.Date()` using R and Quarto - Analysis based on MEAN EARNINGS*
+
+----
+
