@@ -329,7 +329,7 @@ GROUP_B_LABEL <- "Never-Married Males" # Display label for Group B
 MIN_OCCUPATION_COUNT <- 30   # Minimum sample size for occupation analysis
 TOP_N_OCCUPATIONS <- 20      # Number of top occupations to display
 
-# Occupations to analyze for pay gaps (partial text matching)
+# Specify Occupations to analyze for pay gaps (partial text matching)
 OCCUPATION_GAP_ANALYSIS <- c("MED-Physicians", "MED-Surgeons", "MED-Dentists", "MED-Pharmacists", 
                             "LGL-Lawyers, And Judges, Magistrates, And Other Judicial Workers", 
                             "EDU-Postsecondary Teachers", "MGR-General And Operations Managers", 
@@ -691,7 +691,7 @@ if (!FORCE_REFRESH && file.exists(cache_raw)) {
   cat("Year:", SURVEY_YEAR, "\n")
   cat("This may take several minutes...\n\n")
   
-  # Download PUMS data with SCHL (educational attainment) added
+  # Download all PUMS data
   invisible(capture.output(
     pums_data <- get_pums(
       variables = c("SEX", "MAR", "SCHL", "OCCP", "PINCP", "PERNP", "AGEP", "COW"),
