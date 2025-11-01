@@ -113,8 +113,7 @@ knitr:
 
 # Prevent scientific notation globally
 options(scipen = 999)
-
-
+options(device = "quartz")  # macOS native graphics device
 options(tigris_use_cache = TRUE)
 
 # install.packages(c("mapview", "survey", "srvyr", "arcgislayers"))
@@ -205,8 +204,45 @@ set.seed(123)
 
 ```
 
- 
- 
+# Levels of Census Data
+
+
+### 📍 Geographies available in PUMS
+
+    Nationwide (United States as a whole)
+
+    States, District of Columbia, and Puerto Rico
+
+        Each state has its own PUMS data.
+
+    Public Use Microdata Areas (PUMAs)
+
+        Minimum population: 100,000+
+
+        Smallest geography in PUMS
+
+🚫 What PUMS does not cover
+
+    Counties
+
+    Places (cities, towns)
+
+    Census tracts or block groups
+
+    School districts, ZIP codes, or congressional districts
+    
+
+
+![](img/tidycensus_geographies.png){width=100% height=100% fig-align="left"}
+
+
+![](img/census_diagram.png){width=100% height=100% fig-align="left"}
+
+
+
+![](img/adaptive_design.png){width=100% height=100% fig-align="left"}
+
+
 # Building a TidyCensus Research Workflow
 
 ## Initial Search Strategy
@@ -225,17 +261,34 @@ The Census Bureau typically organizes tables around 1-2 main dimensions, not fiv
 ```{r}
 
 # Retrieve by loading the four variables (columns) from acs5 dataframe 
-all_vars_5 <- load_variables(2023, "acs5")
+all_vars_acs5 <- load_variables(2023, "acs5")
 
 
 # Look for any mention of your variable across both fields
-earnings_vars <- all_vars_5 %>%
-  filter(str_detect(tolower(concept), "earning|income") | 
-         str_detect(tolower(label), "earning|income"))
+acs5_earnings_vars <- all_vars_acs5 %>%
+  filter(str_detect(tolower(concept), "earn|income") | 
+         str_detect(tolower(label), "earn|income"))
 
-  View(earnings_vars)
+  View(acs5_earnings_vars)
   
-  
+library(DT)
+library(htmlwidgets)
+
+# Create the datatable (client-side)
+dt_table <- datatable(
+  acs5_earnings_vars,
+  options = list(
+    pageLength = 10,   # rows per page
+    scrollX = TRUE     # horizontal scroll
+  )
+)
+
+# Save as HTML in your home directory
+saveWidget(dt_table, file = "~/acs5_earnings_vars_tbl.html", selfcontained = TRUE)
+
+
+
+
 # Check what concepts exist
 earnings_concepts <- earnings_vars %>% 
   distinct(concept)
@@ -251,7 +304,7 @@ earnings_labels <- earnings_vars %>%
 
 ```
 
-Results:  8670 obs. of 4 variables
+Results:  8670 obs. of 4 variables from 28,261 total
 
 
 
@@ -260,11 +313,11 @@ Results:  8670 obs. of 4 variables
 ```{r}
 
 # Retrieve by loading the four variables (columns) from acs5 dataframe 
-all_vars_5 <- load_variables(2023, "acs5")
+all_vars_acs5 <- load_variables(2023, "acs5")
 
 
 # Look for any mention of your variables across both fields
-sex_vars <- all_vars_5 %>%
+sex_vars <- all_vars_acs5 %>%
   filter(str_detect(tolower(concept), "sex") | 
          str_detect(tolower(label), "sex"))
 
@@ -295,11 +348,11 @@ Results:  6845 obs. of 4 variables
 ```{r}
 
 # Retrieve by loading the four variables (columns) from acs5 dataframe 
-all_vars_5 <- load_variables(2023, "acs5")
+all_vars_acs5 <- load_variables(2023, "acs5")
 
 
 # Look for any mention of your characteristics across both variables
-marital_vars <- all_vars_5 %>%
+marital_vars <- all_vars_acs5 %>%
   filter(str_detect(tolower(concept), "marital") | 
          str_detect(tolower(label), "marital"))
 
@@ -331,11 +384,11 @@ Results:  918 obs. of 4 variables
 ```{r}
 
 # Retrieve by loading the four variables (columns) from acs5 dataframe 
-all_vars_5 <- load_variables(2023, "acs5")
+all_vars_acs5 <- load_variables(2023, "acs5")
 
 
 # Look for any mention of your characteristics across both variables
-occupation_vars <- all_vars_5 %>%
+occupation_vars <- all_vars_acs5 %>%
   filter(str_detect(tolower(concept), "occupation") | 
          str_detect(tolower(label), "occupation"))
 
@@ -367,11 +420,11 @@ Results:  5843 obs. of 4 variables
 ```{r}
 
 # Retrieve by loading the four variables (columns) from acs5 dataframe 
-all_vars_5 <- load_variables(2023, "acs5")
+all_vars_acs5 <- load_variables(2023, "acs5")
 
 
 # Look for any mention of your characteristics across both variables
-experience_vars <- all_vars_5 %>%
+experience_vars <- all_vars_acs5 %>%
   filter(str_detect(tolower(concept), "experience") | 
          str_detect(tolower(label), "experience"))
 
@@ -430,12 +483,12 @@ Instead of guessing table numbers, I searched by concepts:
 
 
 # Start broad - what tables mention earnings AND marital status?
-all_vars_5 %>%
+all_vars_acs5 %>%
   filter(str_detect(concept, "earning") & 
          str_detect(concept, "marital"))
 
 # When that failed, search separately
-all_vars_5 %>%
+all_vars_acs5 %>%
   filter(str_detect(concept, "marital"))
 
 ```
@@ -449,7 +502,7 @@ When concept searches failed, I used table structure exploration:
 #| eval: false
 
 # See ALL variables in a promising table
-b07008_all <- all_vars_5 %>%
+b07008_all <- all_vars_acs5 %>%
   filter(str_starts(name, "B07008"))
 
 # Look at first 10-20 to understand the pattern
@@ -492,7 +545,7 @@ When I found "never married" existed, I asked: where else does it appear?
 #| eval: false
 
 # Find all tables with "never married"
-never_married_any <- all_vars_5 %>%
+never_married_any <- all_vars_acs5 %>%
   filter(str_detect(label, "never married")) %>%
   mutate(table = str_extract(name, "^[A-Z][0-9]+")) %>%
   count(table, sort = TRUE)
@@ -523,7 +576,7 @@ When specific searches failed, I searched for what kinds of data exist:
 #| eval: false
 
 # What earnings tables exist at all?
-earnings_tables <- all_vars_5 %>%
+earnings_tables <- all_vars_acs5 %>%
   filter(str_starts(name, "B20")) %>%
   distinct(table = str_extract(name, "^[A-Z][0-9]+"), concept)
 

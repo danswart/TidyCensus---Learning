@@ -119,7 +119,7 @@ knitr:
 
 # Prevent scientific notation globally
 options(scipen = 999)
-
+options(device = "quartz")  # macOS native graphics device
 options(tigris_use_cache = TRUE)
 
 # install.packages(c("mapview", "survey", "srvyr", "arcgislayers"))
