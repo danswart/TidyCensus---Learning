@@ -1,0 +1,10 @@
+---
+title: "Claude Prompts"
+format: html
+---
+
+Refactor the attached qmd file to use complete namespacing syntax and formatting, including base() and stats() functions.  This file was created using very primitive display functions.  Use flextable() for all tables (not DT or kableExtra or pipe tables).   The cat() function calls are great opportunities to display content as a table.  Create a downloadable qmd file complete from yaml to last line of code.      keep the yaml and setup code chunks exactly as they are.    This is a big job - step through it CAREFULLY.  namespace each and every line.  DO NOT use parsing functions to search for items that required namespacing.   DO NOT use parsing functions to search for items that required namespacing.
+
+
+
+

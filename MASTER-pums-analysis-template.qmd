@@ -2,11 +2,9 @@
 title: "PUMS Pay Gap Analysis Template"
 subtitle: "Enhanced Template with Educational Attainment Filtering and Debug Tracking"
 description: "Using ACS5 database with education level parameters - Debug Version"
-author: 
+authors: 
   - name: "Dan Swart, CPA (ret)"
-    affiliations:
-      - "SCUC-ISD Board of Trustees"
-      - "Seat 6"
+  - name: "Claude Sonnet 4.5"
 date: today
 date-format: long
 # bibliography: manual-refs.bib
@@ -26,7 +24,15 @@ format:
     code-block-bg: "#FAEBD7"
     code-block-border-left: "#31BAE9"
     embed-resources: true
-    include-in-header: header.html
+    include-in-header:
+      - text: 
+          <link href="https://fonts.googleapis.com/css2?family=Lato&display=swap" rel="stylesheet">
+          <link href="https://fonts.googleapis.com/css2?family=Fira+Mono&display=swap" rel="stylesheet">
+          <link href="https://fonts.googleapis.com/css2?family=Montserrat&display=swap" rel="stylesheet">
+          <link href="https://fonts.googleapis.com/css2?family=Cabin&display=swap" rel="stylesheet">
+          <link href="https://fonts.googleapis.com/css2?family=Roboto+Slab&display=swap" rel="stylesheet">
+          <link href="https://fonts.googleapis.com/css2?family=Schoolbell&display=swap" rel="stylesheet">
+      - header.html
     css:
       - swart.css
       - tachyons.min.css
@@ -55,8 +61,10 @@ format:
       x: 1in
       y: 1in
     toc: true
-    fontsize: 14pt
+    fontsize: 16pt
     mainfont: "Cabin"
+  
+
     
   revealjs:
     slide-number: true
@@ -106,28 +114,241 @@ knitr:
     warning: false
     message: false
     cache: false
-    fig.width: 12
-    fig.height: 10
 
 
 ---
+
 
 
 ```{r}
 #| label: setup
 #| include: false
 
-# Prevent scientific notation globally
-options(scipen = 999)
-options(device = "quartz")  # macOS native graphics device
-options(tigris_use_cache = TRUE)
 
 # install.packages(c("mapview", "survey", "srvyr", "arcgislayers"))
 
 # census_api_key("95496766c51541ee6f402c1e1a8658581285b759", install = TRUE, overwrite = TRUE)
 
 
-# load libraries
+# # load libraries - NOT NEEDED
+
+
+# Force dplyr's select to take precedence
+select <- dplyr::select
+filter <- dplyr::filter
+
+# Options
+options(scipen = 999)
+options(qic.clshade = T) # NO LONGER NEEDED; CHARTS ALL PREPARED WITH GGPLOT2 ONLY
+options(qic.linecol = 'black') # NO LONGER NEEDED; CHARTS ALL PREPARED WITH GGPLOT2 ONLY
+options(qic.signalcol = "firebrick") # NO LONGER NEEDED; CHARTS ALL PREPARED WITH GGPLOT2 ONLY
+options(qic.targetcol = "purple") # NO LONGER NEEDED; CHARTS ALL PREPARED WITH GGPLOT2 ONLY
+options(DT.options = list(dom = 'pBlfrti')) # Add buttons, filtering, and top (t) pagination controls
+options(shiny.maxRequestSize = 50 * 1024^2) # Set upload maximum to 50 MB
+options(tigris_use_cache = TRUE)
+options(device = "RStudioGD") 
+
+
+# Flextable defaults:
+flextable::set_flextable_defaults(
+  font.size = 14, 
+  font.family = "Cabin",
+  font.color = "black",
+  table.layout = "fixed",
+  border.color = "darkgray",
+  padding.top = 3, padding.bottom = 3,
+  padding.left = 4, padding.right = 4,
+  line_spacing = 1.3,
+  digits = 2,
+  decimal.mark = ".",
+  big.mark = " ",
+  na_str = "<na>",
+  post_process_html = identity,
+  post_process_docx = identity
+)
+
+
+#
+# # Sample Code:
+# flextable::flextable(violations) |>
+ #  flextable::set_header_labels(
+ #    Variable = "Variable",
+ #    Measurement = "Measurement",
+ #    Likely_Impact = "Likely Impact"
+ #  ) |>
+#    flextable::add_header_lines(values = "Frequent Violations of Scientific Method in Current So-Called 'Equity' Research") |>
+#   flextable::color(i = 1, color = "blue", part = "header") |>
+#   flextable::italic(i = 1, part = "header") |>
+#   flextable::align(i = 1, align = "center", part = "header") |>
+#   flextable::fontsize(i = 1, size = 14, part = "header") |>
+#   flextable::bg(i = 1, bg = "white", part = "header") |>
+#   flextable::bg(i = 2, bg = "palegreen", part = "header") |>
+#   flextable::bold(i = 1:2, part = "header") |>
+#   flextable::bold(i = 1:7, j = 1, part = "body") |>
+#   ftExtra::colformat_md() |> 
+#   flextable::autofit()
+  
+
+# Flextable built-in themes:
+  # flextable::theme_alafoli()	|>  # BLAH
+  # flextable::theme_apa()  # THIS IS NICE
+  # flextable::theme_booktabs() |>  # NICE, MORE COMPACT
+  # flextable::theme_box() |>   # OK, INCLUDES CELL BORDERS
+  # flextable::theme_tron() |>  # 'DARK MODE' BLUE TEXT
+  # flextable::theme_tron_legacy() |>   # 'DARK MODE' YELLOW TEXT
+  # flextable::theme_vader() |>    # 'DARK MODE' WHITE TEXT
+  # flextable::theme_vanilla() |>   # NOT SPECIAL
+  # flextable::theme_zebra()	|>
+  #
+
+# Flextable titles:
+  # flextable::colformat_double(j = c("Mean", "SD", "N"), big.mark = ",", digits = 1) |>
+  # flextable::flextable(variance_comparison) |>
+  #  flextable::add_header_lines(values = "The Within-Group vs Between-Group Variance Problem") |>
+
+# Flextable Title theming at table-level:
+  #  flextable::color(i = 1, color = "blue", part = "header") |>
+  #  flextable::italic(i = 1, part = "header") |>
+  #  flextable::align(i = 1, align = "center", part = "header") |>
+  #  flextable::fontsize(i = 1, size = 14, part = "header") |>
+  #  flextable::bg(i = 1, bg = "white", part = "header") |>
+
+# Flextable standard table background colors:
+  #  flextable::bg(i = 2, bg = "palegreen", part = "header") |>
+  
+
+# Flextable reading markdown:
+  #  ftExtra::colformat_md() |> 
+
+# Flextable auto-sizing cell widths:
+  #  flextable::autofit() 
+ 
+ # Flextable background based on SPECIFIC cell contents:
+  #
+  # flextable::bg(i = ~ Impact_on_Validity == "High", j = "Impact_on_Validity", bg = "#ffcccc") |>
+ # flextable::bg(i = ~ Impact_on_Validity == "Medium", j = "Impact_on_Validity", bg = "#ffffcc") |>
+  #
+  # 
+  # Apply yellow background to any cell containing "Yes":
+
+  # for (col in base::names(hypotheses_data)) {
+  #   yes_rows <- base::which(hypotheses_data[[col]] == "Yes")
+  #   if (base::length(yes_rows) > 0) {
+  #     ft <- ft |>
+  #       flextable::bg(i = yes_rows, j = col, bg = "yellow", part = "body")
+  #   }
+  # } 
+  #
+  # Apply to last row of table:
+  #
+  #
+
+
+
+# Set global theme for consistent plots
+ggplot2::theme_set(
+  ggplot2::theme_minimal(base_size = 20) +
+    ggplot2::theme(
+      plot.title.position = "plot",
+      plot.title = ggtext::element_textbox_simple(
+        family = "Cabin",
+        face = "bold",
+        color = "darkgreen",
+        size = 26,
+        fill = "yellow",
+        lineheight = 1.2,
+        padding = ggplot2::margin(5.5, 5.5, 0.0, 5.5),
+        margin = ggplot2::margin(0, 0, 5.5, 0)
+      ),
+      plot.subtitle = ggtext::element_textbox_simple(
+        family = "Cabin",
+        color = "darkgreen",
+        face = "bold",
+        size = 24,
+        fill = "yellow",
+        lineheight = 1.2,
+        padding = ggplot2::margin(5.5, 5.5, 5.5, 5.5),
+        margin = ggplot2::margin(10.5, 0, 5.5, 0)
+      ),
+      plot.caption = ggtext::element_markdown(
+        family = "Cabin",
+        size = 22,
+        hjust = 1,
+        color = "darkblue",
+        face = "italic",
+        fill = "yellow",
+        lineheight = 1.0
+      ),
+      axis.text.x = ggtext::element_markdown(
+        family = "Cabin",
+        face = "bold",
+        color = "blue",
+        size = 20,
+        angle = 45,
+        hjust = 1
+      ),
+        # ggplot2::element_blank(),
+      axis.title.x = ggtext::element_markdown(
+        family = "Cabin",
+        face = "bold",
+        color = "blue",
+        size = 20),
+        # ggplot2::element_blank(),
+      axis.text.y = ggtext::element_markdown(
+        family = "Cabin",
+        face = "bold",
+        color = "blue",
+        size = 20,
+        angle = 45,
+        hjust = 1
+      ),
+        # ggplot2::element_blank(),
+      axis.title.y = ggtext::element_markdown(
+        family = "Cabin",
+        face = "bold",
+        color = "blue",
+        size = 20),
+        # ggplot2::element_blank(),
+      strip.text = ggtext::element_markdown(
+        family = "Cabin",
+        color = "black",
+        size = ggplot2::rel(1.1),
+        face = "italic",
+        margin = ggplot2::margin(2, 0, 0.5, 0, "lines")
+      ),
+      axis.text = ggtext::element_markdown(
+        family = "Cabin",
+        color = "black"),
+      panel.background = ggplot2::element_rect(fill = "white", color = NA),
+      plot.background = ggplot2::element_rect(fill = "white", color = NA),
+      legend.position = "none",
+      panel.spacing.x = grid::unit(1.5, "cm"),
+      panel.spacing.y = grid::unit(1.5, "cm"),
+      plot.margin = ggplot2::margin(20, 20, 20, 20, "pt")
+    )
+)
+
+
+
+  
+# Set seed for reproducibility
+base::set.seed(123)
+
+```
+
+```{r}
+#| label: create cache directory
+
+# Create cache directory
+if (!dir.exists("cache_data")) {
+  dir.create("cache_data")
+}
+
+```
+
+
+```{r}
+#| label: load libraries
 
 library(tidyverse)
 library(tidycensus)
@@ -141,44 +362,11 @@ library(ggplot2)
 library(scales)
 library(forcats)
 
-
-# Force dplyr's select to take precedence
-select <- dplyr::select
-filter <- dplyr::filter
-
-# Create cache directory
-if (!dir.exists("cache_data")) {
-  dir.create("cache_data")
-}
-
-# Set default chunk options
-knitr::opts_chunk$set(
-  echo = TRUE,
-  warning = FALSE,
-  message = FALSE,
-  fig.width = 12,
-  fig.height = 10
-)
-
-# Set global theme for consistent plots
-theme_set(theme_minimal(base_size = 20) + 
-          theme(
-    plot.title = element_text(face = "bold", size = 26),    # adjust title size
-    plot.subtitle = element_text(face = "bold", size = 24), # adjust subtitle size
-    axis.title.x = element_text(face = "bold", size = 22),
-    axis.title.y = element_text(face = "bold", size = 22),
-    axis.text.x = element_text(face = "bold", size = 22, angle = 45, hjust = 1),
-    legend.position = "bottom",
-    strip.text = element_text(face = "bold"),
-    panel.spacing.x = unit(1.5, "cm"),  # Horizontal spacing only
-    panel.spacing.y = unit(1.5, "cm"),   # Vertical spacing only
-    plot.margin = margin(20, 20, 20, 20, "pt")
-    )
-)
+```
 
 
-# Set seed for reproducibility
-set.seed(123)
+```{r}
+#| label: debug tracking dataframe
 
 # Create debug tracking dataframe
 debug_tracker <- data.frame(
@@ -189,6 +377,7 @@ debug_tracker <- data.frame(
 )
 
 ```
+
 
 
 <!-- 
@@ -275,7 +464,10 @@ Click "Render" in RStudio or run: quarto render yourfile.qmd
 
 **Modify these parameters for your specific analysis:**
 
-```{r parameters}
+```{r}
+#| label: main parameters
+
+
 # ============================================
 #           MAIN ANALYSIS PARAMETERS
 # ============================================
@@ -285,6 +477,14 @@ STATE_CODE <- "TX"           # State abbreviation
 SURVEY_YEAR <- 2023          # Year of ACS data
 AGE_MIN <- 40                # Minimum age
 AGE_MAX <- 64                # Maximum age
+
+```
+
+
+```{r}
+#| label: set education codes
+
+
 
 # ============================================
 #        EDUCATIONAL ATTAINMENT FILTERS
@@ -299,6 +499,7 @@ AGE_MAX <- 64                # Maximum age
 GROUP_A_EDUCATION_CODE <- 23  # NULL or a code like "23" for professional degree
 GROUP_B_EDUCATION_CODE <- 23  # NULL or a code like c("21", "22") for bachelor's/master's
 
+
 # Option 2: Filter by education label pattern (regex)
 # Examples: "Bachelor", "Master|Professional", "degree"
 # NULL to not filter by label
@@ -306,28 +507,47 @@ GROUP_B_EDUCATION_CODE <- 23  # NULL or a code like c("21", "22") for bachelor's
 GROUP_A_EDUCATION_LABEL <- NULL  # Example: "Professional degree"
 GROUP_B_EDUCATION_LABEL <- NULL  # Example: "Bachelor|Master"
 
+
 # Minimum education level (optional)
 # Filters to include only this code and higher
 # Common thresholds: "16" (HS), "21" (Bachelor's), "22" (Master's)
 MIN_EDUCATION_CODE <- NULL  # Example: "21" for bachelor's and above
+
+```
+
+
+```{r}
+#| label: group definitions
 
 # ============================================
 #           GROUP DEFINITIONS
 # ============================================
 
 # Group A definition
-GROUP_A_SEX <- "2"           # "1" = Male, "2" = Female
-GROUP_A_MAR <- "5"           # "5" = Never married, NULL = all marital statuses
-GROUP_A_LABEL <- "Never-Married Females"  # Display label for Group A
+GROUP_A_SEX <- "2"                          # "1" = Male, "2" = Female
+GROUP_A_MAR <- "5"                          # "5" = Never married, NULL = all marital statuses
+GROUP_A_LABEL <- "Never-Married Females"    # Display label for Group A
 
 # Group B definition
-GROUP_B_SEX <- "1"           # "1" = Male, "2" = Female  
-GROUP_B_MAR <- "5"           # NULL = all marital statuses, or specify code
-GROUP_B_LABEL <- "Never-Married Males" # Display label for Group B
+GROUP_B_SEX <- "1"                          # "1" = Male, "2" = Female  
+GROUP_B_MAR <- "5"                          # NULL = all marital statuses, or specify code
+GROUP_B_LABEL <- "Never-Married Males"      # Display label for Group B
+
+```
+
+
+```{r}
+#| label: set sample sizes
 
 # Analysis options
 MIN_OCCUPATION_COUNT <- 30   # Minimum sample size for occupation analysis
 TOP_N_OCCUPATIONS <- 20      # Number of top occupations to display
+
+```
+
+```{r}
+#| label: specify Occupations
+
 
 # Specify Occupations to analyze for pay gaps (partial text matching)
 OCCUPATION_GAP_ANALYSIS <- c("MED-Physicians", "MED-Surgeons", "MED-Dentists", "MED-Pharmacists", 
@@ -342,9 +562,16 @@ OCCUPATION_SEARCH_EXAMPLES <- c("Clerk", "Driver")
 # Note: These use partial matching. "Manager" matches all manager occupations.
 # For specific occupations, use precise terms like "General and operations managers"
 
+```
+
+```{r}
+#| label: cache management
+
+
 # Cache management
 CACHE_PREFIX <- "nm_fem_vs_nm_male_edu"  # Unique prefix for cache files
 FORCE_REFRESH <- FALSE       # Set TRUE to ignore cache and download fresh data
+
 
 # ============================================
 #           DERIVED PARAMETERS
@@ -354,6 +581,13 @@ FORCE_REFRESH <- FALSE       # Set TRUE to ignore cache and download fresh data
 cache_raw <- paste0("cache_data/", CACHE_PREFIX, "_raw.rds")
 cache_processed <- paste0("cache_data/", CACHE_PREFIX, "_processed.rds")
 cache_analysis <- paste0("cache_data/", CACHE_PREFIX, "_analysis.rds")
+
+```
+
+
+```{r}
+#| label: build text descripts
+
 
 # Create analysis description with debugging
 cat("\n=== BUILDING EDUCATION DESCRIPTIONS ===\n")
@@ -403,7 +637,9 @@ cat("Description:", ANALYSIS_DESCRIPTION, "\n")
 cat("Data Year:", SURVEY_YEAR, "\n")
 cat("Cache Prefix:", CACHE_PREFIX, "\n")
 cat("===============================\n\n")
+
 ```
+
 
 # Data Functions
 
@@ -508,6 +744,12 @@ filter_pums_data <- function(data, sex_code, mar_code = NULL,
   return(result)
 }
 
+```
+
+
+```{r}
+#| label: pay gap calc function
+
 # Function to calculate pay gap with statistical testing - WITH ERROR HANDLING
 calculate_pay_gap <- function(data, occupation_filter = NULL) {
   
@@ -584,6 +826,13 @@ calculate_pay_gap <- function(data, occupation_filter = NULL) {
   ))
 }
 
+```
+
+
+```{r}
+#| label: function to create formatted tables
+
+
 # Function to create formatted tables
 create_summary_table <- function(data, title = NULL) {
   if (knitr::is_html_output()) {
@@ -592,6 +841,13 @@ create_summary_table <- function(data, title = NULL) {
     knitr::kable(data, caption = title, format = "simple")
   }
 }
+
+```
+
+
+```{r}
+#| label: Helper function to explore available occupations in the data
+
 
 # Helper function to explore available occupations in the data
 explore_occupations <- function(search_term = NULL, data = pums_data) {
@@ -611,6 +867,12 @@ explore_occupations <- function(search_term = NULL, data = pums_data) {
   return(occ_summary)
 }
 
+```
+
+
+```{r}
+#| label: function to explore education levels in the data
+
 # New function to explore education levels in the data
 explore_education <- function(data = pums_data) {
   edu_summary <- data %>%
@@ -625,6 +887,12 @@ explore_education <- function(data = pums_data) {
   
   return(edu_summary)
 }
+
+```
+
+
+```{r}
+#| label: Function to search for specific occupations - WITH ERROR HANDLING
 
 # Function to search for specific occupations - WITH ERROR HANDLING
 search_occupation <- function(search_term, data = group_a_data) {
@@ -673,6 +941,8 @@ search_occupation <- function(search_term, data = group_a_data) {
 }
 ```
 
+
+
 # Data Collection
 
 ```{r data-collection}
@@ -711,6 +981,12 @@ cat("\n=== RAW DATA SUMMARY ===\n")
 cat("Total records downloaded:", nrow(pums_data), "\n")
 cat("Variables included:", paste(names(pums_data), collapse = ", "), "\n")
 
+```
+
+
+```{r}
+#| label: check SCHL values
+
 # Check SCHL values
 cat("\n=== EDUCATION (SCHL) VALUES CHECK ===\n")
 schl_summary <- pums_data %>%
@@ -734,6 +1010,7 @@ if (23 %in% schl_summary$SCHL) {
 
 cat("================================\n")
 ```
+
 
 # Data Processing
 
@@ -1365,6 +1642,8 @@ This analysis uses American Community Survey (ACS) 5-year Public Use Microdata S
 - 22: Master's degree
 - 23: Professional degree beyond bachelor's
 - 24: Doctorate degree
+
+
 
 # Cache Information
 
