@@ -336,33 +336,77 @@ base::set.seed(123)
 ```
 
 
-```{r}
-#| label: libraries
+# Levels of Census Data
 
-library(tidyverse)
-library(tidycensus)
-library(DT)
-library(htmlwidgets)
+```{r}
+#| label: load and cashe census data for use throughout
+#| results: hide
+
+
+# ----- Cache 2023 ACS5 variable definitions -----
+
+acs5_vars_cache <- "data/acs5_vars_2023.rds"
+
+if (base::file.exists(acs5_vars_cache)) {
+  all_vars_acs5 <- base::readRDS(acs5_vars_cache)
+} else {
+  all_vars_acs5 <- tidycensus::load_variables(2023, "acs5")
+  base::saveRDS(all_vars_acs5, acs5_vars_cache)
+}
+
+
+
+# ----- Cache ACS 5-year PUMS data -----
+
+pums5_cache_file <- "data/tx_pums5_2023.rds"
+
+if (base::file.exists(pums5_cache_file)) {
+  tx_pums5 <- base::readRDS(pums5_cache_file)
+} else {
+  tx_pums5 <- tidycensus::get_pums(
+    variables = base::c("SEX", "MAR", "WAGP", "WKHP", "ESR"), 
+    state = "TX",
+    survey = "acs5",
+    year = 2023
+  )
+  base::saveRDS(tx_pums5, pums5_cache_file)
+}
+
+
+
+# ----- Cache 2023 ACS 1-year PUMS data -----
+pums1_cache_file <- "data/tx_pums1_2023.rds"
+
+if (base::file.exists(pums1_cache_file)) {
+  tx_pums1 <- base::readRDS(pums1_cache_file)
+} else {
+  tx_pums1 <- tidycensus::get_pums(
+    variables = base::c("SEX", "MAR", "WAGP", "WKHP", "ESR"),
+    state = "TX",
+    survey = "acs1",
+    year = 2023
+  )
+  base::saveRDS(tx_pums1, pums1_cache_file)
+}
+
+
 
 
 ```
 
-# Levels of Census Data
+
 
 
 ### 📍 Geographies available in PUMS
 
-    Nationwide (United States as a whole)
+* Nationwide (United States as a whole)  
+* States, District of Columbia, and Puerto Rico  
+  *   Each state has its own PUMS data.  
+* Public Use Microdata Areas (PUMAs)  
+  *  Minimum population: 100,000+
+  *  Smallest geography in PUMS
 
-    States, District of Columbia, and Puerto Rico
 
-        Each state has its own PUMS data.
-
-    Public Use Microdata Areas (PUMAs)
-
-        Minimum population: 100,000+
-
-        Smallest geography in PUMS
 
 🚫 What PUMS does not cover
 
@@ -405,43 +449,42 @@ The Census Bureau typically organizes tables around 1-2 main dimensions, not fiv
 
 # Retrieve by loading the four variables (columns) from acs5 dataframe 
 
-all_vars_acs5 <- tidycensus::load_variables(2023, "acs5")
+# all_vars_acs5 <- tidycensus::load_variables(2023, "acs5")
 
 # Look for any mention of your variable across both fields
-acs5_earnings_vars <- all_vars_acs5 %>%
-  filter(str_detect(tolower(concept), "earn|income") | 
-         str_detect(tolower(label), "earn|income"))
+acs5_earnings_vars <- all_vars_acs5 |>
+  dplyr::filter(stringr::str_detect(base::tolower(concept), "earn|income") | 
+                stringr::str_detect(base::tolower(label), "earn|income"))
 
-  glimpse(acs5_earnings_vars)
-  
 
-# Create the datatable (client-side)
-dt_table <- datatable(
-  acs5_earnings_vars,
-  options = list(
-    pageLength = 10,   # rows per page
-    scrollX = TRUE     # horizontal scroll
-  )
-)
-
-# # Save as HTML in your home directory
-# saveWidget(dt_table, file = "~/acs5_earnings_vars_tbl.html", selfcontained = TRUE)
-
+# Create flextable for display
+acs5_earnings_vars |>
+  dplyr::slice_head(n = 5) |>
+  flextable::flextable() |> 
+  flextable::add_header_lines(values = "ACS5 Earnings Variables") |>
+  flextable::color(i = 1, color = "blue", part = "header") |>
+  flextable::italic(i = 1, part = "header") |>
+  flextable::align(i = 1, align = "center", part = "header") |>
+  flextable::fontsize(i = 1, size = 14, part = "header") |>
+  flextable::bg(i = 1, bg = "white", part = "header") |>
+  flextable::bg(i = 2, bg = "palegreen", part = "header") |>
+  flextable::bold(i = 1:2, part = "header") |>
+  ftExtra::colformat_md() |> 
+  flextable::autofit()
 
 
 
 # Check what concepts exist
-acs5_earnings_concepts <- acs5_earnings_vars %>% 
-  distinct(concept)
+acs5_earnings_concepts <- acs5_earnings_vars |> 
+  dplyr::distinct(concept)
 
-  glimpse(acs5_earnings_concepts)
-
+dplyr::slice_head(acs5_earnings_concepts, n = 5)
 
 # Check what labels exist
-earnings_labels <- acs5_earnings_vars %>% 
-  distinct(label) 
+earnings_labels <- acs5_earnings_vars |> 
+  dplyr::distinct(label) 
 
-  glimpse(earnings_labels)
+dplyr::slice_head(earnings_labels, n = 5)
 
 ```
 
@@ -453,30 +496,26 @@ Results:  8670 obs. of 4 variables from 28,261 total
 
 ```{r}
 
-# Retrieve by loading the four variables (columns) from acs5 dataframe 
+# Look for any mention of your variable 'sex' across both fields
+sex_vars <- all_vars_acs5 |>
+  dplyr::filter(stringr::str_detect(base::tolower(concept), "sex") | 
+                stringr::str_detect(base::tolower(label), "sex"))
 
-all_vars_acs5 <- tidycensus::load_variables(2023, "acs5")
-
-# Look for any mention of your variables across both fields
-sex_vars <- all_vars_acs5 %>%
-  filter(str_detect(tolower(concept), "sex") | 
-         str_detect(tolower(label), "sex"))
-
-  glimpse(sex_vars)
+dplyr::slice_head(sex_vars, n = 5)
   
   
 # Check what concepts exist
-sex_concepts <- sex_vars %>% 
-  distinct(concept)
+sex_concepts <- sex_vars |> 
+  dplyr::distinct(concept)
 
-  glimpse(sex_concepts)
+dplyr::slice_head(sex_concepts, n = 5)
 
 
 # Check what labels exist for earnings
-sex_labels <- sex_vars %>% 
-  distinct(label) 
+sex_labels <- sex_vars |> 
+  dplyr::distinct(label) 
 
-  glimpse(sex_labels)
+dplyr::slice_head(sex_labels, n = 5)
 
 ```
 
@@ -488,30 +527,26 @@ Results:  6845 obs. of 4 variables
 
 ```{r}
 
-# Retrieve by loading the four variables (columns) from acs5 dataframe 
+# Look for any mention of your characteristics 'marital' across both variables
+marital_vars <- all_vars_acs5 |>
+  dplyr::filter(stringr::str_detect(base::tolower(concept), "marital") | 
+                stringr::str_detect(base::tolower(label), "marital"))
 
-all_vars_acs5 <- tidycensus::load_variables(2023, "acs5")
-
-# Look for any mention of your characteristics across both variables
-marital_vars <- all_vars_acs5 %>%
-  filter(str_detect(tolower(concept), "marital") | 
-         str_detect(tolower(label), "marital"))
-
-  glimpse(marital_vars)
+dplyr::slice_head(marital_vars)
   
   
 # Check what concepts exist
-marital_concepts <- marital_vars %>% 
-  distinct(concept)
+marital_concepts <- marital_vars |> 
+  dplyr::distinct(concept)
 
-  glimpse(marital_concepts)
+dplyr::slice_head(marital_concepts)
 
 
 # Check what labels exist
-marital_labels <- marital_vars %>% 
-  distinct(label) 
+marital_labels <- marital_vars |> 
+  dplyr::distinct(label) 
 
-  glimpse(marital_labels)
+dplyr::slice_head(marital_labels, n = 5)
 
 ```
 
@@ -524,30 +559,26 @@ Results:  918 obs. of 4 variables
 
 ```{r}
 
-# Retrieve by loading the four variables (columns) from acs5 dataframe 
-
-all_vars_acs5 <- tidycensus::load_variables(2023, "acs5")
-
 # Look for any mention of your characteristics across both variables
-occupation_vars <- all_vars_acs5 %>%
-  filter(str_detect(tolower(concept), "occupation") | 
-         str_detect(tolower(label), "occupation"))
+occupation_vars <- all_vars_acs5 |>
+  dplyr::filter(stringr::str_detect(base::tolower(concept), "occupation") | 
+                stringr::str_detect(base::tolower(label), "occupation"))
 
-  glimpse(occupation_vars)
+dplyr::slice_head(occupation_vars, n = 5)
   
   
 # Check what concepts exist
-occupation_concepts <- occupation_vars %>% 
-  distinct(concept)
+occupation_concepts <- occupation_vars |> 
+  dplyr::distinct(concept)
 
-  glimpse(occupation_concepts)
+dplyr::slice_head(occupation_concepts, n = 5)
 
 
 # Check what labels exist
-occupation_labels <- occupation_vars %>% 
-  distinct(label) 
+occupation_labels <- occupation_vars |> 
+  dplyr::distinct(label) 
 
-  glimpse(occupation_labels)
+dplyr::slice_head(occupation_labels, n = 5)
 
 ```
 
@@ -560,29 +591,26 @@ Results:  5843 obs. of 4 variables
 
 ```{r}
 
-# Retrieve by loading the four variables (columns) from acs5 dataframe 
-all_vars_acs5 <- tidycensus::load_variables(2023, "acs5")
+# Look for any mention of your characteristic 'experience' across both variables
+experience_vars <- all_vars_acs5 |>
+  dplyr::filter(stringr::str_detect(base::tolower(concept), "experience") | 
+                stringr::str_detect(base::tolower(label), "experience"))
 
-# Look for any mention of your characteristics across both variables
-experience_vars <- all_vars_acs5 %>%
-  filter(str_detect(tolower(concept), "experience") | 
-         str_detect(tolower(label), "experience"))
-
-  glimpse(experience_vars)
+dplyr::slice_head(experience_vars, n = 5)
   
   
 # Check what concepts exist
-experience_concepts <- experience_vars %>% 
-  distinct(concept)
+experience_concepts <- experience_vars |> 
+  dplyr::distinct(concept)
 
-  glimpse(experience_concepts)
+dplyr::slice_head(experience_concepts, n = 5)
 
 
 # Check what labels exist
-experience_labels <- experience_vars %>% 
-  distinct(label) 
+experience_labels <- experience_vars |> 
+  dplyr::distinct(label) 
 
-  glimpse(experience_labels)
+dplyr::slice_head(experience_labels, n = 5)
 
 ```
 
@@ -614,7 +642,6 @@ B15xxx = Education tables
 
 
 
-
 ### 2. Concept-Based Searching
 Instead of guessing table numbers, I searched by concepts:
 
@@ -623,13 +650,13 @@ Instead of guessing table numbers, I searched by concepts:
 
 
 # Start broad - what tables mention earnings AND marital status?
-all_vars_acs5 %>%
-  filter(str_detect(concept, "earning") & 
-         str_detect(concept, "marital"))
+all_vars_acs5 |>
+  dplyr::filter(stringr::str_detect(concept, "earning") & 
+                stringr::str_detect(concept, "marital"))
 
 # When that failed, search separately
-all_vars_acs5 %>%
-  filter(str_detect(concept, "marital"))
+all_vars_acs5 |>
+  dplyr::filter(stringr::str_detect(concept, "marital"))
 
 ```
 
@@ -642,11 +669,11 @@ When concept searches failed, I used table structure exploration:
 #| eval: true
 
 # See ALL variables in a promising table
-b07008_all <- all_vars_acs5 %>%
-  filter(str_starts(name, "B07008"))
+b07008_all <- all_vars_acs5 |>
+  dplyr::filter(stringr::str_starts(name, "B07008"))
 
 # Look at first 10-20 to understand the pattern
-print(b07008_all, n = 30)
+base::print(b07008_all, n = 30)
 
 ```
 
@@ -685,10 +712,10 @@ When I found "never married" existed, I asked: where else does it appear?
 #| eval: true
 
 # Find all tables with "never married"
-never_married_any <- all_vars_acs5 %>%
-  filter(str_detect(label, "never married")) %>%
-  mutate(table = str_extract(name, "^[A-Z][0-9]+")) %>%
-  count(table, sort = TRUE)
+never_married_any <- all_vars_acs5 |>
+  dplyr::filter(stringr::str_detect(label, "never married")) |>
+  dplyr::mutate(table = stringr::str_extract(name, "^[A-Z][0-9]+")) |>
+  dplyr::count(table, sort = TRUE)
 
 ```
 
@@ -716,9 +743,9 @@ When specific searches failed, I searched for what kinds of data exist:
 #| eval: true
 
 # What earnings tables exist at all?
-earnings_tables <- all_vars_acs5 %>%
-  filter(str_starts(name, "B20")) %>%
-  distinct(table = str_extract(name, "^[A-Z][0-9]+"), concept)
+earnings_tables <- all_vars_acs5 |>
+  dplyr::filter(stringr::str_starts(name, "B20")) |>
+  dplyr::distinct(table = stringr::str_extract(name, "^[A-Z][0-9]+"), concept)
 
 ```
 
@@ -766,21 +793,6 @@ This meant we needed custom crosstabs → PUMS
 
 
 ## PUMS Solution
-
-```{r}
-#| eval: true
-#| results: hide
-
-
-# Downloaded microdata with individual-level records
-tx_pums <- get_pums(
-  variables = c("SEX", "MAR", "WAGP", "WKHP", "ESR"),
-  state = "TX", 
-  year = 2023
-)
-
-```
-
 
 5. Analysis Refinements
 
@@ -870,24 +882,11 @@ This workflow shows how exploratory data analysis often requires pivoting from t
 
 # Sowell's comparison - Part 1
 
-```{r}
-#| eval: true
-#| results: hide
-
-
-tx_pums <- get_pums(
-  variables = c("SEX", "MAR", "WAGP", "WKHP", "ESR"), 
-  state = "TX",
-  survey = "acs5",
-  year = 2023
-)
-
-```
 
 ```{r}
 
-dplyr::glimpse(tx_pums)
-
+# dplyr::slice_head(tx_pums5)
+dplyr::slice_head(tx_pums5, n = 5)
 ```
 
 # Sowell's comparison - Part 2 of 2
@@ -898,26 +897,48 @@ dplyr::glimpse(tx_pums)
 
 
 # High earners as proxy for professionals
-professionals_proxy <- tx_pums %>%
-  filter(
-    WAGP >= 60000,  # $60k+ as professional proxy
+professionals_proxy <- tx_pums5 |>
+  dplyr::filter(
+    WAGP >= 60000,
     WKHP == 40,
-    ESR %in% c("1", "2")
-  ) %>%
-  mutate(
-    group = case_when(
+    ESR %in% base::c("1", "2")
+  ) |>
+  dplyr::mutate(
+    group = dplyr::case_when(
       SEX == "1" ~ "Male",
       SEX == "2" & MAR == "5" ~ "Female Never Married",
       TRUE ~ "Female Other"
     )
-  ) %>%
-  group_by(group) %>%
-  summarise(
-    median_wage = median(WAGP),
-    n = n()
+  ) |>
+  dplyr::group_by(group) |>
+  dplyr::summarise(
+    median_wage = stats::median(WAGP),
+    n = dplyr::n()
   )
 
-glimpse(professionals_proxy)
+dplyr::slice_head(professionals_proxy, n = 5)
+
+# Display as flextable
+professionals_proxy |>
+  dplyr::slice_head(n = 5) |>
+  flextable::flextable() |>
+  flextable::set_header_labels(
+    group = "Group",
+    median_wage = "Median Wage",
+    n = "Count"
+  ) |>
+  flextable::add_header_lines(values = "Income Level as Proxy for 'Professional' Category") |>
+  flextable::colformat_double(j = "median_wage", big.mark = ",", digits = 0) |>
+  flextable::colformat_int(j = "n", big.mark = ",") |>
+  flextable::color(i = 1, color = "blue", part = "header") |>
+  flextable::italic(i = 1, part = "header") |>
+  flextable::align(i = 1, align = "center", part = "header") |>
+  flextable::fontsize(i = 1, size = 14, part = "header") |>
+  flextable::bg(i = 1, bg = "white", part = "header") |>
+  flextable::bg(i = 2, bg = "palegreen", part = "header") |>
+  flextable::bold(i = 1:2, part = "header") |>
+  ftExtra::colformat_md() |> 
+  flextable::autofit()
 
 ```
 
@@ -928,11 +949,11 @@ glimpse(professionals_proxy)
 
 
 # Statistical test for professional wages
-prof_test <- tx_pums %>%
-  filter(WAGP >= 60000, WKHP == 40, ESR %in% c("1", "2")) %>%
-  filter(SEX == "1" | (SEX == "2" & MAR == "5"))  # Males vs never-married females
+prof_test <- tx_pums5 |>
+  dplyr::filter(WAGP >= 60000, WKHP == 40, ESR %in% base::c("1", "2")) |>
+  dplyr::filter(SEX == "1" | (SEX == "2" & MAR == "5"))
 
-t.test(WAGP ~ SEX, data = prof_test)
+stats::t.test(WAGP ~ SEX, data = prof_test)
 
 ```
 
@@ -942,34 +963,53 @@ t.test(WAGP ~ SEX, data = prof_test)
 ```{r}
 #| eval: true
 
-
-
 # Since we don't have education in our data, let's look at very high earners
 # where education is likely similar
-very_high_earners <- tx_pums %>%
-  filter(
-    WAGP >= 100000,  # $100k+ 
+very_high_earners <- tx_pums5 |>
+  dplyr::filter(
+    WAGP >= 100000,
     WKHP == 40,
-    ESR %in% c("1", "2")
-  ) %>%
-  mutate(
-    group = case_when(
+    ESR %in% base::c("1", "2")
+  ) |>
+  dplyr::mutate(
+    group = dplyr::case_when(
       SEX == "1" ~ "Male",
       SEX == "2" & MAR == "5" ~ "Female Never Married"
     )
-  ) %>%
-  filter(group %in% c("Male", "Female Never Married")) %>%
-  group_by(group) %>%
-  summarise(
-    median_wage = median(WAGP),
-    mean_wage = mean(WAGP),
-    n = n()
+  ) |>
+  dplyr::filter(group %in% base::c("Male", "Female Never Married")) |>
+  dplyr::group_by(group) |>
+  dplyr::summarise(
+    median_wage = stats::median(WAGP),
+    mean_wage = base::mean(WAGP),
+    n = dplyr::n()
   )
 
-glimpse(very_high_earners)
+dplyr::slice_head(very_high_earners, n = 5)
+
+# Display as flextable
+very_high_earners |>
+  flextable::flextable() |>
+  flextable::set_header_labels(
+    group = "Group",
+    median_wage = "Median Wage",
+    mean_wage = "Mean Wage",
+    n = "Count"
+  ) |>
+  flextable::add_header_lines(values = "Very High Earners Analysis ($100k+)") |>
+  flextable::colformat_double(j = base::c("median_wage", "mean_wage"), big.mark = ",", digits = 0) |>
+  flextable::colformat_int(j = "n", big.mark = ",") |>
+  flextable::color(i = 1, color = "blue", part = "header") |>
+  flextable::italic(i = 1, part = "header") |>
+  flextable::align(i = 1, align = "center", part = "header") |>
+  flextable::fontsize(i = 1, size = 14, part = "header") |>
+  flextable::bg(i = 1, bg = "white", part = "header") |>
+  flextable::bg(i = 2, bg = "palegreen", part = "header") |>
+  flextable::bold(i = 1:2, part = "header") |>
+  # flextable::bold(i = 1:7, j = 1, part = "body") |>
+  ftExtra::colformat_md() |> 
+  flextable::autofit()
 
 ```
-
-
 
 

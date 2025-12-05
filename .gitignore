@@ -91,6 +91,9 @@ packrat/
 # Large temporary data files
 temp-*.rds
 temp-*.RDS
+data/*.rds
+*.rds
+
 
 # Raw data (if large)
 data-raw/
@@ -135,8 +138,6 @@ large_*.rds
 large_*.RDS
 large_*.csv
 large_*.xlsx
-
-
 
 
 
