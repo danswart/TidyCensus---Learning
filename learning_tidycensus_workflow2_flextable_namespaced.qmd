@@ -1,0 +1,1442 @@
+---
+title: "TidyCensus Multi-Variable Research Workflow"
+subtitle: "Finding ACS Tables for Earnings × Demographic Analysis"
+description: ""
+authors: 
+  - name: "Dan Swart, CPA (ret)"
+  - name: "Claude Sonnet 4.5"
+date: today
+date-format: long
+# bibliography: manual-refs.bib
+format:
+  html:
+    resources:
+      - reference-backlinks.js
+    include-after-body:    
+      - text: |
+          # <script type="text/javascript" src="reference-backlinks.js"></script>
+    default: true         
+    code-copy: true
+    code-link: true        # This adds individual buttons
+    code-fold: true        # Hide code by default, show on click
+    code-summary: "Show the code"
+    code-overflow: wrap
+    code-block-bg: "#FAEBD7"
+    code-block-border-left: "#31BAE9"
+    embed-resources: false  # Fast for drafts. Override for final output
+    include-in-header:
+      - text: 
+          <link href="https://fonts.googleapis.com/css2?family=Lato&display=swap" rel="stylesheet">
+          <link href="https://fonts.googleapis.com/css2?family=Fira+Mono&display=swap" rel="stylesheet">
+          <link href="https://fonts.googleapis.com/css2?family=Montserrat&display=swap" rel="stylesheet">
+          <link href="https://fonts.googleapis.com/css2?family=Cabin&display=swap" rel="stylesheet">
+          <link href="https://fonts.googleapis.com/css2?family=Roboto+Slab&display=swap" rel="stylesheet">
+          <link href="https://fonts.googleapis.com/css2?family=Schoolbell&display=swap" rel="stylesheet">
+      - header.html
+    css:
+      - swart.css
+      - tachyons.min.css
+      - r-colors.css
+    fontsize: 18pt
+    lightbox: true
+    page-layout: full
+    fig-width: 12
+    fig-height: 10
+    fig-dpi: 300
+    html-math-method: katex
+    df-print: paged
+    toc: true
+    toc-float: true
+    citeproc: true
+    link-citations: true
+    linestretch: 1.0
+    
+    
+    
+  typst:
+    fig-width: 12
+    fig-height: 10
+    fig-dpi: 300
+    margin:
+      x: 1in
+      y: 1in
+    toc: true
+    fontsize: 16pt
+    mainfont: "Cabin"
+  
+
+    
+  revealjs:
+    slide-number: true
+    transition: fade
+    code-overflow: wrap
+    center: true
+    smaller: true
+    scrollable: true
+    chalkboard: true
+    multiplex: false
+    theme: solarized
+    reference-location: margin
+    logo: img/red-cross-640-435.png
+    footer: "Footer text"
+    code-block-height: 650px
+
+
+
+  # docx:
+  #   highlight-style: github
+  #   fig_caption: true
+
+
+
+editor: source
+
+quarto:
+  render:
+    cache-refresh: true
+
+
+# for .qmd filesd
+execute:
+  echo: true
+  message: false
+  warning: false
+  eval: true
+  fig-width: 12
+  fig-height: 10
+
+
+# for .rmd files
+knitr:
+  opts_chunk:
+    echo: true
+    error: false
+    warning: false
+    message: false
+    cache: false
+
+
+---
+
+
+```{r}
+#| label: setup
+#| include: false
+
+
+# install.packages(c("mapview", "survey", "srvyr", "arcgislayers"))
+
+# census_api_key("95496766c51541ee6f402c1e1a8658581285b759", install = TRUE, overwrite = TRUE)
+
+
+# # load libraries - NOT NEEDED
+
+
+# Force dplyr's select to take precedence
+select <- dplyr::select
+filter <- dplyr::filter
+
+# Options
+base::options(scipen = 999)
+base::options(qic.clshade = TRUE)
+base::options(qic.linecol = 'black')
+base::options(qic.signalcol = "firebrick")
+base::options(qic.targetcol = "purple")
+base::options(DT.options = base::list(dom = 'pBlfrti'))
+base::options(shiny.maxRequestSize = 50 * 1024^2)
+base::options(tigris_use_cache = TRUE)
+base::options(device = "RStudioGD") 
+
+
+# Flextable defaults:
+flextable::set_flextable_defaults(
+  font.size = 14, 
+  font.family = "Cabin",
+  font.color = "black",
+  table.layout = "fixed",
+  border.color = "darkgray",
+  padding.top = 3, padding.bottom = 3,
+  padding.left = 4, padding.right = 4,
+  line_spacing = 1.3,
+  digits = 2,
+  decimal.mark = ".",
+  big.mark = " ",
+  na_str = "<na>",
+  layout = "autofit"
+)
+
+
+#
+# # Sample Code:
+# flextable::flextable(violations) |>
+ #  flextable::set_header_labels(
+ #    Variable = "Variable",
+ #    Measurement = "Measurement",
+ #    Likely_Impact = "Likely Impact"
+ #  ) |>
+#    flextable::add_header_lines(values = "Frequent Violations of Scientific Method in Current So-Called 'Equity' Research") |>
+#   flextable::color(i = 1, color = "blue", part = "header") |>
+#   flextable::italic(i = 1, part = "header") |>
+#   flextable::align(i = 1, align = "center", part = "header") |>
+#   flextable::fontsize(i = 1, size = 14, part = "header") |>
+#   flextable::bg(i = 1, bg = "white", part = "header") |>
+#   flextable::bg(i = 2, bg = "palegreen", part = "header") |>
+#   flextable::bold(i = 1:2, part = "header") |>
+#   flextable::bold(i = 1:7, j = 1, part = "body") |>
+#   ftExtra::colformat_md() |> 
+#  flextable::autofit()
+  
+
+# Flextable built-in themes:
+  # flextable::theme_alafoli()	|>  # BLAH
+  # flextable::theme_apa()  # THIS IS NICE
+  # flextable::theme_booktabs() |>  # NICE, MORE COMPACT
+  # flextable::theme_box() |>   # OK, INCLUDES CELL BORDERS
+  # flextable::theme_tron() |>  # 'DARK MODE' BLUE TEXT
+  # flextable::theme_tron_legacy() |>   # 'DARK MODE' YELLOW TEXT
+  # flextable::theme_vader() |>    # 'DARK MODE' WHITE TEXT
+  # flextable::theme_vanilla() |>   # NOT SPECIAL
+  # flextable::theme_zebra()	|>
+  #
+
+# Flextable titles:
+  # flextable::colformat_double(j = c("Mean", "SD", "N"), big.mark = ",", digits = 1) |>
+  # flextable::flextable(variance_comparison) |>
+  #  flextable::add_header_lines(values = "The Within-Group vs Between-Group Variance Problem") |>
+
+# Flextable Title theming at table-level:
+  #  flextable::color(i = 1, color = "blue", part = "header") |>
+  #  flextable::italic(i = 1, part = "header") |>
+  #  flextable::align(i = 1, align = "center", part = "header") |>
+  #  flextable::fontsize(i = 1, size = 14, part = "header") |>
+  #  flextable::bg(i = 1, bg = "white", part = "header") |>
+
+# Flextable standard table background colors:
+  #  flextable::bg(i = 2, bg = "palegreen", part = "header") |>
+  
+
+# Flextable reading markdown:
+  #  ftExtra::colformat_md() |> 
+
+# Flextable auto-sizing cell widths:
+  #  flextable::autofit() 
+ 
+ # Flextable background based on SPECIFIC cell contents:
+  #
+  # flextable::bg(i = ~ Impact_on_Validity == "High", j = "Impact_on_Validity", bg = "#ffcccc") |>
+ # flextable::bg(i = ~ Impact_on_Validity == "Medium", j = "Impact_on_Validity", bg = "#ffffcc") |>
+  #
+  # 
+  # Apply yellow background to any cell containing "Yes":
+
+  # for (col in base::names(hypotheses_data)) {
+  #   yes_rows <- base::which(hypotheses_data[[col]] == "Yes")
+  #   if (base::length(yes_rows) > 0) {
+  #     ft <- ft |>
+  #       flextable::bg(i = yes_rows, j = col, bg = "yellow", part = "body")
+  #   }
+  # } 
+  #
+  # Apply to last row of table:
+  #
+  #
+
+
+
+# Set global theme for consistent plots
+ggplot2::theme_set(
+  ggplot2::theme_minimal(base_size = 20) +
+    ggplot2::theme(
+      plot.title.position = "plot",
+      plot.title = ggtext::element_textbox_simple(
+        family = "Cabin",
+        face = "bold",
+        color = "darkgreen",
+        size = 26,
+        fill = "yellow",
+        lineheight = 1.2,
+        padding = ggplot2::margin(5.5, 5.5, 0.0, 5.5),
+        margin = ggplot2::margin(0, 0, 5.5, 0)
+      ),
+      plot.subtitle = ggtext::element_textbox_simple(
+        family = "Cabin",
+        color = "darkgreen",
+        face = "bold",
+        size = 24,
+        fill = "yellow",
+        lineheight = 1.2,
+        padding = ggplot2::margin(5.5, 5.5, 5.5, 5.5),
+        margin = ggplot2::margin(10.5, 0, 5.5, 0)
+      ),
+      plot.caption = ggtext::element_markdown(
+        family = "Cabin",
+        size = 22,
+        hjust = 1,
+        color = "darkblue",
+        face = "italic",
+        fill = "yellow",
+        lineheight = 1.0
+      ),
+      axis.text.x = ggtext::element_markdown(
+        family = "Cabin",
+        face = "bold",
+        color = "blue",
+        size = 20,
+        angle = 45,
+        hjust = 1
+      ),
+        # ggplot2::element_blank(),
+      axis.title.x = ggtext::element_markdown(
+        family = "Cabin",
+        face = "bold",
+        color = "blue",
+        size = 20),
+        # ggplot2::element_blank(),
+      axis.text.y = ggtext::element_markdown(
+        family = "Cabin",
+        face = "bold",
+        color = "blue",
+        size = 20,
+        angle = 45,
+        hjust = 1
+      ),
+        # ggplot2::element_blank(),
+      axis.title.y = ggtext::element_markdown(
+        family = "Cabin",
+        face = "bold",
+        color = "blue",
+        size = 20),
+        # ggplot2::element_blank(),
+      strip.text = ggtext::element_markdown(
+        family = "Cabin",
+        color = "black",
+        size = ggplot2::rel(1.1),
+        face = "italic",
+        margin = ggplot2::margin(2, 0, 0.5, 0, "lines")
+      ),
+      axis.text = ggtext::element_markdown(
+        family = "Cabin",
+        color = "black"),
+      panel.background = ggplot2::element_rect(fill = "white", color = NA),
+      plot.background = ggplot2::element_rect(fill = "white", color = NA),
+      legend.position = "none",
+      panel.spacing.x = grid::unit(1.5, "cm"),
+      panel.spacing.y = grid::unit(1.5, "cm"),
+      plot.margin = ggplot2::margin(20, 20, 20, 20, "pt")
+    )
+)
+
+
+
+  
+# Set seed for reproducibility
+base::set.seed(123)
+
+```
+
+
+
+```{r}
+#| label: all-purpose-cache-function
+#| eval: true
+
+# Generic tidycensus caching function
+cache_census_api_call <- function(
+    type = base::c("acs", "pums", "variables", "decennial"),
+    year = 2023,
+    survey = "acs5",
+    state = NULL,
+    geography = NULL,
+    table = NULL,
+    variables = NULL,
+    cache_dir = "data",
+    force_refresh = FALSE
+) {
+  
+  type <- base::match.arg(type)
+  
+  # Build descriptive cache filename
+  state_str <- if (base::is.null(state)) {
+    "none"
+  } else if (base::length(state) == 1 && state == "all") {
+    "all"
+  } else {
+    base::paste(base::sort(state), collapse = "-")
+  }
+  
+  vars_str <- if (!base::is.null(variables)) {
+    base::paste0("_", base::substr(rlang::hash(variables), 1, 8))
+  } else if (!base::is.null(table)) {
+    base::paste0("_", table)
+  } else {
+    ""
+  }
+
+  
+  geo_str <- if (!base::is.null(geography)) {
+    base::paste0("_", geography)
+  } else {
+    ""
+  }
+  
+  cache_file <- base::file.path(
+    cache_dir,
+    base::paste0(type, "_", survey, "_", year, "_", state_str, geo_str, vars_str, ".rds")
+  )
+  
+  # Create cache directory if needed
+  if (!base::dir.exists(cache_dir)) {
+    base::dir.create(cache_dir, recursive = TRUE)
+  }
+  
+  # Return cached data if exists and not forcing refresh
+  if (base::file.exists(cache_file) && !force_refresh) {
+    base::message("Loading from cache: ", cache_file)
+    return(base::readRDS(cache_file))
+  }
+  
+  # Otherwise fetch from API
+  base::message("Fetching from API...")
+  
+  result <- base::switch(
+    type,
+    "variables" = tidycensus::load_variables(year, survey),
+    "acs" = tidycensus::get_acs(
+      geography = geography,
+      table = table,
+      variables = variables,
+      state = state,
+      year = year,
+      survey = survey
+    ),
+    "pums" = tidycensus::get_pums(
+      variables = variables,
+      state = state,
+      year = year,
+      survey = survey
+    ),
+    "decennial" = tidycensus::get_decennial(
+      geography = geography,
+      variables = variables,
+      state = state,
+      year = year
+    )
+  )
+  
+  # Cache and return
+  base::saveRDS(result, cache_file)
+  base::message("Cached to: ", cache_file)
+  
+  result
+}
+
+```
+
+
+
+```{r}
+#| label: use-cases-for-api-function
+
+# # Load ALL ACS variables
+# all_vars_acs5 <- cache_census_api_call(
+#   type = "variables",
+#   year = 2023,
+#   survey = "acs5"
+# )
+# # Cache file: data/variables_acs5_2023_none.rds
+# 
+# 
+# # Get ACS for specific states and specific tables
+# earnings_tx_ca <- cache_census_api_call(
+#   type = "acs",
+#   geography = "county",
+#   table = "B20017",
+#   state = base::c("TX", "CA"),
+#   year = 2023,
+#   survey = "acs5"
+# )
+# # Cache file: data/acs_acs5_2023_CA-TX_county_B20017.rds
+# 
+# 
+# # Get PUMS for specific variables for Texas
+# tx_pums5 <- cache_census_api_call(
+#   type = "pums",
+#   variables = base::c("SEX", "MAR", "WAGP", "WKHP", "ESR"),
+#   state = "TX",
+#   year = 2023,
+#   survey = "acs5"
+# )
+# # Cache file: data/pums_acs5_2023_TX_a1b2c3d4.rds (hash of variables)
+# 
+# 
+# # Get PUMS for specific variables for all states
+# pums_all <- cache_census_api_call(
+#   type = "pums",
+#   variables = base::c("SEX", "MAR", "OCCP", "WAGP", "AGEP", "WKHP"),
+#   state = "all",
+#   year = 2023,
+#   survey = "acs5"
+# )
+# # Cache file: data/pums_acs5_2023_all_e5f6g7h8.rds
+# 
+# 
+# # # Force refresh when you need new data
+# # tx_pums_fresh <- cache_census_api_call(
+# #   type = "pums",
+# #   variables = base::c("SEX", "MAR", "WAGP"),
+# #   state = "TX",
+# #   year = 2023,
+# #   survey = "acs5",
+# #   force_refresh = TRUE
+# # )
+
+```
+
+**Your `data/` folder after multiple calls:**
+
+data/
+  variables_acs5_2023_none.rds
+  acs_acs5_2023_CA-TX_county_B20017.rds
+  pums_acs5_2023_TX_a1b2c3d4.rds
+  pums_acs5_2023_all_e5f6g7h8.rds
+
+
+
+```{r}
+# # Function to cache any tidycensus variable lookup
+# load_variables_check_cached <- function(year, dataset, cache_dir = "cache_data") {
+#   cache_file <- base::paste0(cache_dir, "/", dataset, "_variables_", year, ".rds")
+#   
+#   if (base::file.exists(cache_file)) {
+#     base::readRDS(cache_file)
+#   } else {
+#     vars <- tidycensus::load_variables(year, dataset)
+#     base::saveRDS(vars, cache_file)
+#     vars
+#   }
+# }
+
+# # Usage - automatically checks cache first, only calls API if needed
+# all_vars_5 <- load_variables_check_cached(2023, "acs5")
+
+```
+
+
+```{r}
+# # ----- Cache ACS 5-year PUMS data (all states, with occupation) -----
+# 
+# pums_all_states_cache_file <- "data/pums_all_states_2023.rds"
+# 
+# if (base::file.exists(pums_all_state_cache_file)) {
+#   pums_data <- base::readRDS(pums_cache_file)
+# } else {
+#   pums_data <- tidycensus::get_pums(
+#     variables = base::c("SEX", "MAR", "OCCP", "WAGP", "AGEP", "WKHP"),
+#     state = "all",
+#     year = 2023,
+#     survey = "acs5"
+#   )
+#   base::saveRDS(pums_data, pums_all_cache_file)
+# }
+
+```
+
+## Overview
+
+This workflow demonstrates strategies for finding American Community Survey (ACS) tables that contain multiple demographic characteristics simultaneously, specifically focusing on:
+
+-   Earnings/Income
+-   Sex
+-   Marital Status (never married, not including divorced or widowed)
+-   Occupation
+-   Years of Experience
+
+
+
+## Step 1: Load All Available Variables
+
+```{r load-acs5-variables}
+#| cache: true
+
+# Load all ACS 5-year variables for 2023
+all_vars_5 <- cache_census_api_call(
+  type = "variables",
+  year = 2023,
+  survey = "acs5",
+  state = "all"
+  )
+
+# Examine structure
+all_vars_5 |>
+  utils::head(10) |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "Structure of all_vars_5 (first 10 rows)") |> 
+  flextable::autofit()
+
+```
+
+Results:  28,261 obs. of 4 variables
+
+
+
+
+## Step 2: Initial Exploration (The "Hail Mary" Approach)
+
+```{r initial-search}
+
+# Original approach: search for all five variables in concept field
+all_variables <- all_vars_5 |>
+  dplyr::filter(stringr::str_detect(concept, "earning|income") &
+                stringr::str_detect(concept, "sex") &
+                stringr::str_detect(concept, "marital") &
+                stringr::str_detect(concept, "occupation") &
+                stringr::str_detect(concept, "experience"))
+
+# Result: Zero matches (as expected)
+base::nrow(all_variables)
+
+```
+
+
+
+
+**Reality Check:** This approach yields zero results because ACS tables typically organize data around 1-2 main dimensions, not five simultaneously.
+
+
+
+
+## Step 3: Strategic Variable Discovery
+
+### 3.1 Search Concept AND Label Fields for each variable
+
+#### If you happen to know the critical characteristic in advance (such as a replication study) you can search for that characteristic first.
+
+In this case it as 'females, never-married'
+
+
+#### Search for 'never_married' - instances in dataframe
+
+```{r}
+#| cache: true
+
+# Load all ACS 5-year variables for ALL states for year 2023
+all_vars_5 <-  cache_census_api_call(
+  type = "variables",
+  year = 2023,
+  survey = "acs5",
+  state = "all"
+  )
+
+# Look for any mention of your variables across both fields
+never_married_vars <- all_vars_5 |>
+  dplyr::filter(stringr::str_detect(base::tolower(concept), "never married") | 
+                stringr::str_detect(base::tolower(label), "never married"))
+
+never_married_vars |>
+  utils::head(20) |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "never_married_vars (first 20 rows)") |> 
+  flextable::autofit()
+
+  
+# Check what concepts exist
+never_married_concepts <- never_married_vars |> 
+  dplyr::distinct(concept) |>
+  dplyr::arrange(concept)
+
+  # View(never_married_concepts)
+
+
+# Check what labels exist
+never_married_labels <- never_married_vars |> 
+  dplyr::distinct(label) |> 
+  dplyr::arrange(label)
+
+  # View(never_married_labels)
+
+base::print(base::paste("Found", base::nrow(never_married_concepts), "different never_married-related concepts"))
+
+
+# Display earnings concepts in a table
+never_married_concepts |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "Never Married Concepts") |> 
+  flextable::autofit()
+
+# Display earnings labels in a table
+never_married_labels |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "Never Married Labels") |> 
+  flextable::autofit()
+
+
+```
+
+Results:  186 obs. of 4 variables
+
+
+
+
+### Conclusion:  There may be no way to isolate a 'never-married female' from the 'never-married, widowed, or divorced' females for my categories of interest.  They seem lumped together.  
+
+***If this doesn't work:  Try the PUMS dataframe from U.S. Census***
+
+
+
+
+### Investigate the other variables needed
+
+(***earnings*** × sex × marital status x occupation x years of experience)
+
+#### 'earnings|income|wage' - instances in dataframe
+
+```{r search-both-fields}
+
+# Load ALL ACS 5-year variables for ALL states for year 2023
+all_vars_5 <-  cache_census_api_call(
+  type = "variables",
+  year = 2023,
+  survey = "acs5",
+  state = "all"
+  )
+
+# Look for any mention of your variables across both fields
+earnings_vars <- all_vars_5 |>
+  dplyr::filter(stringr::str_detect(base::tolower(concept), "earning|income|wage") | 
+                stringr::str_detect(base::tolower(label), "earning|income|wage"))
+
+earnings_vars |>
+  utils::head(20) |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "earnings_vars (first 20 rows)") |> 
+  flextable::autofit()
+
+  
+# Check what concepts exist
+earnings_concepts <- earnings_vars |> 
+  dplyr::distinct(concept) |>
+  dplyr::arrange(concept)
+
+  # View(earnings_concepts)
+
+
+# Check what labels exist
+earnings_labels <- earnings_vars |> 
+  dplyr::distinct(label) |> 
+  dplyr::arrange(label)
+
+  # View(earnings_labels)
+
+base::print(base::paste("Found", base::nrow(earnings_concepts), "different earnings-related concepts"))
+
+
+# Display earnings concepts in table
+earnings_concepts |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "Earnings Concepts") |> 
+  flextable::autofit()
+
+# Display earnings labels in table
+earnings_labels |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "Earnings Labels") |> 
+  flextable::autofit()
+
+
+```
+
+Results:  8765 obs. of 4 variables
+
+
+
+
+
+
+(earnings × ***sex*** × marital status x occupation x years of experience)
+
+#### 'sex' - instances in dataframe
+
+```{r}
+
+# Load ALL ACS 5-year variables for ALL states for year 2023
+all_vars_5 <-  cache_census_api_call(
+  type = "variables",
+  year = 2023,
+  survey = "acs5",
+  state = "all"
+  )
+
+# Look for any mention of your variables across both fields
+sex_vars <- all_vars_5 |>
+  dplyr::filter(stringr::str_detect(base::tolower(concept), "sex") | 
+                stringr::str_detect(base::tolower(label), "sex"))
+
+sex_vars |>
+  utils::head(20) |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "sex_vars (first 20 rows)") |> 
+  flextable::autofit()
+
+  
+# Check what concepts exist
+sex_concepts <- sex_vars |> 
+  dplyr::distinct(concept) |>
+  dplyr::arrange(concept)
+
+  # View(sex_concepts)
+
+
+# Check what labels exist for earnings
+sex_labels <- sex_vars |> 
+  dplyr::distinct(label) |> 
+  dplyr::arrange(label)
+
+ # View(sex_labels)
+
+base::print(base::paste("Found", base::nrow(sex_concepts), "different sex-related concepts"))
+
+
+# Display earnings concepts
+sex_concepts |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "Sex Concepts") |> 
+  flextable::autofit()
+
+# Display earnings labels
+sex_labels |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "Sex Labels") |> 
+  flextable::autofit()
+
+
+```
+
+Results:  6845 obs. of 4 variables
+
+
+
+
+
+(earnings × sex × ***marital status*** x occupation x years of experience)
+
+#### 'marital status' - instances in dataframe
+
+```{r}
+
+# Load ALL ACS 5-year variables for ALL states for year 2023
+all_vars_5 <-  cache_census_api_call(
+  type = "variables",
+  year = 2023,
+  survey = "acs5",
+  state = "all"
+  )
+
+# Look for any mention of your variables across both fields
+marital_vars <- all_vars_5 |>
+  dplyr::filter(stringr::str_detect(base::tolower(concept), "marital") | 
+                stringr::str_detect(base::tolower(label), "marital"))
+
+marital_vars |>
+  utils::head(20) |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "marital_vars (first 20 rows)") |> 
+  flextable::autofit()
+
+  
+# Check what concepts exist
+marital_concepts <- marital_vars |> 
+  dplyr::distinct(concept) |>
+  dplyr::arrange(concept)
+
+  # View(marital_concepts)
+
+
+# Check what labels exist
+marital_labels <- marital_vars |> 
+  dplyr::distinct(label) |> 
+  dplyr::arrange(label)
+
+  # View(marital_labels)
+
+base::print(base::paste("Found", base::nrow(marital_concepts), "different marital-related concepts"))
+
+
+# Display results in flextables
+marital_concepts |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "Marital Concepts") |> 
+  flextable::autofit()
+
+marital_labels |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "Marital Labels") |> 
+  flextable::autofit()
+
+```
+
+Results:  918 obs. of 4 variables
+
+
+
+
+
+
+
+(earnings × sex × marital status x ***occupation*** x years of experience)
+
+#### 'occupation' - instances in dataframe
+
+```{r}
+
+# Load ALL ACS 5-year variables for ALL states for year 2023
+all_vars_5 <-  cache_census_api_call(
+  type = "variables",
+  year = 2023,
+  survey = "acs5",
+  state = "all"
+  )
+
+# Look for any mention of your variables across both fields
+occupation_vars <- all_vars_5 |>
+  dplyr::filter(stringr::str_detect(base::tolower(concept), "occupation") | 
+                stringr::str_detect(base::tolower(label), "occupation"))
+
+occupation_vars |>
+  utils::head(20) |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "occupation_vars (first 20 rows)") |> 
+  flextable::autofit()
+
+  
+# Check what concepts exist
+occupation_concepts <- occupation_vars |> 
+  dplyr::distinct(concept) |>
+  dplyr::arrange(concept)
+
+  # View(occupation_concepts)
+
+
+# Check what labels exist
+occupation_labels <- occupation_vars |> 
+  dplyr::distinct(label) |> 
+  dplyr::arrange(label)
+
+  # View(occupation_labels)
+
+base::print(base::paste("Found", base::nrow(occupation_concepts), "different occupation-related concepts"))
+
+
+# Display results in flextables
+occupation_concepts |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "Occupation Concepts") |> 
+  flextable::autofit()
+
+
+occupation_labels |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "Occupation Labels") |> 
+  flextable::autofit()
+
+
+```
+
+Results:  5843 obs. of 4 variables
+
+
+
+
+
+
+
+(earnings × sex × marital status x occupation x ***years of experience***)
+
+#### 'experience' - instances in dataframe
+
+```{r}
+
+# Load ALL ACS 5-year variables for ALL states for year 2023
+all_vars_5 <-  cache_census_api_call(
+  type = "variables",
+  year = 2023,
+  survey = "acs5",
+  state = "all"
+  )
+
+# Look for any mention of your variables across both fields
+experience_vars <- all_vars_5 |>
+  dplyr::filter(stringr::str_detect(base::tolower(concept), "experience") | 
+                stringr::str_detect(base::tolower(label), "experience"))
+
+experience_vars |>
+  utils::head(20) |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "experience_vars (first 20 rows)") |> 
+  flextable::autofit()
+
+  
+# Check what concepts exist
+experience_concepts <- experience_vars |> 
+  dplyr::distinct(concept) |>
+  dplyr::arrange(concept)
+
+  # View(experience_concepts)
+
+
+# Check what labels exist
+experience_labels <- experience_vars |> 
+  dplyr::distinct(label) |> 
+  dplyr::arrange(label)
+
+  # View(experience_labels)
+
+base::print(base::paste("Found", base::nrow(experience_concepts), "different experience-related concepts"))
+
+
+# Display results in flextables
+experience_concepts |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "Experience Concepts") |> 
+  flextable::autofit()
+
+experience_labels |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "Experience Labels") |> 
+  flextable::autofit()
+
+```
+
+Results:  1295 obs. of 4 variables
+
+
+
+
+
+
+### 3.2 Search for Combinations of 2-3 Variables
+
+```{r combination-search}
+# Earnings × Sex
+earnings_sex <- all_vars_5 |>
+  dplyr::filter((stringr::str_detect(base::tolower(concept), "earning|income|wage")) &
+                (stringr::str_detect(base::tolower(concept), "sex|male|female")))
+
+# Earnings × Marital Status  
+earnings_marital <- all_vars_5 |>
+  dplyr::filter((stringr::str_detect(base::tolower(concept), "earning|income|wage")) &
+                (stringr::str_detect(base::tolower(concept), "marital")))
+
+# Earnings × Occupation
+earnings_occupation <- all_vars_5 |>
+  dplyr::filter((stringr::str_detect(base::tolower(concept), "earning|income|wage")) &
+                (stringr::str_detect(base::tolower(concept), "occupation")))
+
+# Display results
+combinations_summary <- tibble::tibble(
+  combination = base::c("Earnings × Sex", "Earnings × Marital", "Earnings × Occupation"),
+  n_variables = base::c(base::nrow(earnings_sex), base::nrow(earnings_marital), base::nrow(earnings_occupation))
+)
+
+combinations_summary |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "Variable Combinations Summary") |>
+  flextable::autofit()
+```
+
+
+### 3.3 Explore Specific Table Series
+
+```{r table-series}
+# B20 series: Earnings tables
+b20_tables <- all_vars_5 |>
+  dplyr::filter(stringr::str_starts(name, "B20")) |>
+  dplyr::distinct(concept) |>
+  dplyr::arrange(concept)
+
+# B08 series: Commuting and occupation tables  
+b08_tables <- all_vars_5 |>
+  dplyr::filter(stringr::str_starts(name, "B08")) |>
+  dplyr::distinct(concept) |>
+  dplyr::arrange(concept)
+
+# B19 series: Income tables
+b19_tables <- all_vars_5 |>
+  dplyr::filter(stringr::str_starts(name, "B19")) |>
+  dplyr::distinct(concept) |>
+  dplyr::arrange(concept)
+
+base::print(base::paste("B20 (Earnings) tables:", base::nrow(b20_tables)))
+base::print(base::paste("B08 (Commuting/Occupation) tables:", base::nrow(b08_tables)))
+base::print(base::paste("B19 (Income) tables:", base::nrow(b19_tables)))
+```
+
+```{r display-key-tables}
+# Display most promising table series
+key_tables <- dplyr::bind_rows(
+  b20_tables |> dplyr::mutate(series = "B20"),
+  b08_tables |> dplyr::mutate(series = "B08"), 
+  b19_tables |> dplyr::mutate(series = "B19")
+) |>
+  dplyr::select(series, concept)
+
+key_tables |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "Key Table Series (B20, B08, B19)") |>
+  flextable::autofit()
+```
+
+## Step 4: Deep Dive into Promising Tables
+
+```{r promising-tables}
+
+# Function to examine a specific table in detail
+examine_table <- function(table_pattern) {
+  all_vars_5 |>
+    dplyr::filter(stringr::str_detect(name, table_pattern)) |>
+    dplyr::select(name, label, concept) |>
+    utils::head(20)
+}
+
+
+# Example: Look at B20017 (Median Earnings by Sex and Work Experience)
+b20017_vars <- examine_table("B20017")
+base::print("B20017 Variables (Median Earnings by Sex and Work Experience):")
+```
+
+```{r display-b20017}
+b20017_vars |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "B20017 Variables (Median Earnings by Sex and Work Experience)") |>
+  flextable::autofit()
+```
+
+## Step 5: Alternative Approaches
+
+### 5.1 Consider PUMS Data
+
+```{r pums-option, eval=FALSE}
+# For complex multi-dimensional analysis, consider PUMS (Public Use Microdata)
+# This gives you individual-level records that you can cross-tabulate yourself
+
+# # Example PUMS call (not run here):
+# # Load PUMS data for SPECIFIED ACS 5-year variables for CA for year 2023
+# all_vars_5 <-  cache_census_api_call(
+#   type = "pums",
+#   year = 2023,
+#   variables = base::c("SEX", "MAR", "OCCP", "WAGP", "AGEP"),
+#   survey = "acs5",
+#   state = "CA"
+#   )
+
+```
+
+### 5.2 Multiple Table Strategy
+
+```{r multiple-table-strategy}
+# Strategy: Use multiple related tables and join them
+# Example workflow for combining tables:
+
+# 1. Get earnings by sex from one table
+# 2. Get marital status distributions from another table  
+# 3. Get occupation data from a third table
+# 4. Use geographic identifiers to join at appropriate level
+
+# This requires careful consideration of:
+# - Geographic levels (state, county, tract, etc.)
+# - Margin of error calculations when combining estimates
+# - Potential ecological fallacy issues
+```
+
+
+## Step 6: Recommended Workflow
+
+```{r recommended-workflow, eval=FALSE}
+
+# 1. Start with PUMS for complex multi-dimensional analysis
+
+# Load PUMS data for SPECIFIED ACS 5-year variables for ALL states for year 2023
+pums_data <-  cache_census_api_call(
+  type = "pums",
+  year = 2023,
+  variables = base::c("SEX", "MAR", "OCCP", "WAGP", "AGEP", "WKHP"),
+  survey = "acs5",
+  state = "all"
+  )
+
+
+
+# 2. For summary statistics, identify best 2-3 variable combinations:
+# - Table B20017: Median earnings by sex and work experience  
+# - Table B19001: Household income distribution
+# - Custom tabulations from PUMS data
+
+# 3. Use get_acs() for specific tables:
+earnings_by_sex <-  cache_census_api_call(
+  type = "acs",
+  geography = "state",
+  table = "B20017",
+  year = 2023,
+  survey = "acs5"
+  )
+
+```
+
+## Next Steps
+
+1.  **Prioritize Your Variables**: Identify which 2-3 characteristics are most important
+2.  **Consider PUMS**: For maximum flexibility in cross-tabulations
+3.  **Geographic Level**: Decide on appropriate geographic granularity
+4.  **Margin of Error**: Plan for uncertainty quantification in combined estimates
+5.  **Validation**: Cross-check results with multiple data sources when possible
+
+
+## Resources
+
+-   [TidyCensus Documentation](https://walker-data.com/tidycensus/)
+-   [Census Table Finder](https://data.census.gov/cedsci/)
+-   [ACS Technical Documentation](https://www.census.gov/programs-surveys/acs/technical-documentation.html)
+-   [PUMS Data Dictionary](https://www.census.gov/programs-surveys/acs/microdata/documentation.html)
+
+
+## Step 7: Finding Which Table Contains Each Variable
+
+
+### 7.1 Understanding Variable Name Structure
+
+```{r variable-structure}
+#| cache: true
+
+# Load ALL variables again for demonstration
+
+all_vars_5 <- cache_census_api_call(
+  type = "variables",
+  year = 2023,
+  survey = "acs5",
+  state = "all"
+  )
+
+
+# Examine the structure of variable names
+sample_vars <- all_vars_5 |>
+  utils::head(20) |>
+  dplyr::select(name, label, concept)
+
+# Variable names follow pattern: [TABLE]_[SEQUENCE][E/M]
+# E = Estimate, M = Margin of Error
+# Examples: B01001_001E, B19013_001E, etc.
+
+sample_vars |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "Sample Variable Names (first 20 rows)") |>
+  flextable::autofit()
+```
+
+
+
+### 7.2 Extract Table Names from Variable Names
+
+```{r extract-tables}
+#| cache: true
+
+
+# Extract table names from variable names
+all_vars_with_tables <- all_vars_5 |>
+  dplyr::mutate(
+    # Remove the _XXX[E/M] suffix to get table name
+    table_name = stringr::str_extract(name, "^[A-Z][0-9]{5}[A-Z]*"),
+    # Extract the sequence number and estimate/MOE indicator
+    sequence = stringr::str_extract(name, "_[0-9]{3}[EM]$"),
+    # Clean sequence to just the number
+    sequence_num = base::as.numeric(stringr::str_extract(sequence, "[0-9]{3}")),
+    # Estimate or Margin of Error
+    est_moe = stringr::str_extract(sequence, "[EM]")
+  )
+
+# Look at the structure
+all_vars_with_tables |>
+  utils::head(15) |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "Structure of all_vars_with_tables (first 15 rows)") |>
+  flextable::autofit()
+```
+
+
+### 7.3 Find All Tables and Their Variables
+
+
+```{r tables-summary}
+#| cache: true
+
+# Summary of all tables
+tables_summary <- all_vars_with_tables |>
+  dplyr::filter(!base::is.na(table_name)) |>
+  dplyr::group_by(table_name, concept) |>
+  dplyr::summarise(
+    n_variables = dplyr::n(),
+    min_sequence = base::min(sequence_num, na.rm = TRUE),
+    max_sequence = base::max(sequence_num, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  dplyr::arrange(table_name)
+
+base::print(base::paste("Total number of tables:", base::nrow(tables_summary)))
+
+# Display first 20 tables
+tables_summary |>
+  utils::head(20) |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "Tables Summary (first 20 tables)") |>
+  flextable::autofit()
+```
+
+
+### 7.4 Search for Specific Variables by Table
+
+
+```{r search-by-table}
+# Function to find all variables in a specific table
+get_table_variables <- function(table_name) {
+  all_vars_with_tables |>
+    dplyr::filter(stringr::str_detect(name, base::paste0("^", table_name))) |>
+    dplyr::select(name, label, concept, sequence_num, est_moe) |>
+    dplyr::arrange(sequence_num)
+}
+
+# Example: Get all variables in table B20017 (earnings by sex and experience)
+b20017_all <- get_table_variables("B20017")
+base::print(base::paste("Table B20017 has", base::nrow(b20017_all), "variables"))
+```
+
+```{r display-table-variables}
+#| cache: true
+
+
+b20017_all |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "Table B20017 Variables") |> 
+  flextable::autofit()
+```
+
+
+### 7.5 Find Tables Containing Specific Keywords
+
+```{r keyword-search}
+#| cache: true
+
+# Function to find tables containing specific keywords
+find_tables_by_keyword <- function(keyword) {
+  tables_summary |>
+    dplyr::filter(stringr::str_detect(base::tolower(concept), base::tolower(keyword))) |>
+    dplyr::arrange(dplyr::desc(n_variables))
+}
+
+# Find all tables related to earnings
+earnings_tables <- find_tables_by_keyword("earning")
+base::print(base::paste("Found", base::nrow(earnings_tables), "tables related to earnings"))
+
+earnings_tables |>
+  utils::head(10) |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "Earnings Tables (top 10 by variable count)") |>
+  flextable::autofit()
+```
+
+
+### 7.6 Reverse Lookup: From Variable to Table
+
+```{r reverse-lookup}
+#| cache: true
+
+# Function to find which table a specific variable belongs to
+find_variable_table <- function(variable_name) {
+  all_vars_with_tables |>
+    dplyr::filter(name == variable_name) |>
+    dplyr::select(name, table_name, label, concept)
+}
+
+# Example: Find what table contains B19013_001E (median household income)
+
+variable_info <- find_variable_table("B19013_001E")
+
+variable_info |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "Variable B19013_001E Information") |>
+  flextable::autofit()
+```
+
+
+### 7.7 Data Source Information
+
+```{r data-source}
+
+# The load_variables() function pulls from Census API endpoints:
+# https://api.census.gov/data/2023/acs/acs5/variables.json
+
+# You can also access this directly:
+api_url <- "https://api.census.gov/data/2023/acs/acs5/variables.json"
+base::print(base::paste("Data source:", api_url))
+
+# The four columns come from the JSON structure:
+# - name: variable identifier 
+# - label: descriptive text
+# - concept: table/topic description
+# - geography: geographic levels available (not always populated)
+```
+
+
+### 7.8 Complete Table Exploration Function
+
+```{r exploration-function}
+#| cache: true
+
+# Comprehensive function to explore any table
+explore_table <- function(table_name) {
+  
+  # Get all variables for this table
+  table_vars <- get_table_variables(table_name)
+  
+  # Get estimates only (exclude margins of error)
+  estimates_only <- table_vars |>
+    dplyr::filter(est_moe == "E")
+  
+  # Create summary tibble for display
+  summary_info <- tibble::tibble(
+    Attribute = base::c("Table", "Concept", "Total Variables", "Estimates", "Margins of Error"),
+    Value = base::c(
+      table_name,
+      base::unique(table_vars$concept)[1],
+      base::as.character(base::nrow(table_vars)),
+      base::as.character(base::nrow(estimates_only)),
+      base::as.character(base::nrow(table_vars) - base::nrow(estimates_only))
+    )
+  )
+  
+  # Print summary as flextable
+  summary_info |>
+    flextable::flextable() |>
+    flextable::add_header_lines(values = base::paste("Table Exploration:", table_name)) |>
+    flextable::autofit() 
+  
+  # Return the estimates for viewing
+  return(estimates_only)
+}
+
+# Example usage
+b19001_info <- explore_table("B19001")
+```
+
+```{r display-exploration}
+#| cache: true
+
+b19001_info |>
+  flextable::flextable() |>
+  flextable::add_header_lines(values = "B19001 Estimates") |>
+  flextable::autofit()
+```
+
+
+## Session Info
+
+```{r session-info}
+utils::sessionInfo()
+```

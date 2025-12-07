@@ -93,7 +93,7 @@ temp-*.rds
 temp-*.RDS
 data/*.rds
 *.rds
-
+data/pums_all_states_2023.rds
 
 # Raw data (if large)
 data-raw/
